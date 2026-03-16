@@ -1,0 +1,35 @@
+services:
+  air:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile-dev
+    environment:
+      # === API 配置（必需）===
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-}
+      # 或直接配置 Anthropic（二选一）
+      # - ANTHROPIC_BASE_URL=
+      # - ANTHROPIC_AUTH_TOKEN=
+
+      # === GitLab 配置（必需）===
+      - GITLAB_URL=${GITLAB_URL:-http://172.16.161.203:7990/}
+      - CI_PROJECT_ID=${CI_PROJECT_ID:-}
+      - GITLAB_PRIVATE_TOKEN=${GITLAB_PRIVATE_TOKEN:-}
+
+      # === Claude 配置（可选）===
+      - CLAUDE_MAX_TURNS=${CLAUDE_MAX_TURNS:-25}
+      - CLAUDE_WORK_DIR=${CLAUDE_WORK_DIR:-/workspace}
+
+      # === 钉钉通知（可选）===
+      - DINGTALK_WEBHOOK_URL=${DINGTALK_WEBHOOK_URL:-}
+      - DINGTALK_WEBHOOK_SECRET=${DINGTALK_WEBHOOK_SECRET:-}
+    volumes:
+      # 挂载待审查的代码仓库
+      - ${REPO_PATH:-./test-repo}:/workspace:ro
+    # 默认命令：审查指定 commit
+    command: ["uv", "run", "air", "--commit", "${COMMIT_SHA:-HEAD}"]
+    # 交互式调试时可覆盖：
+    # docker compose run --rm air bash
+    stdin_open: true
+    tty: true
