@@ -4,11 +4,12 @@ a = Analysis(
     ["air/__main__.py"],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[
+        ("air/prompts/*.md", "air/prompts"),
+    ],
     hiddenimports=[
         "air.config",
-        "air.source",
-        "air.reviewer",
+        "air.agent",
         "air.channel",
     ],
     hookspath=[],

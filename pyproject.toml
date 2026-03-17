@@ -6,7 +6,7 @@ requires-python = ">=3.13"
 dependencies = [
     "claude-agent-sdk>=0.1.48",
     "python-dotenv>=1.2.2",
-    "python-gitlab>=4.0",
+    "requests>=2.32.5",
 ]
 
 [project.scripts]

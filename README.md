@@ -1,6 +1,6 @@
 # AiR — AI Code Reviewer
 
-在 GitLab CI/CD 流水线中自动进行代码审查，使用 Claude Code (claude-agent-sdk) 对每次 commit 进行分析，并将结果推送到钉钉。
+在 GitLab CI/CD 流水线中自动进行代码审查，使用 Claude Code (claude-agent-sdk) 对每次 push 中的所有 commit 进行分析，并将结果推送到钉钉。
 
 ---
 
@@ -18,45 +18,39 @@
 | `DINGTALK_WEBHOOK_URL` | 钉钉机器人 Webhook 地址 | `https://oapi.dingtalk.com/robot/send?access_token=xxx` |
 | `DINGTALK_WEBHOOK_SECRET` | 钉钉机器人签名密钥（可选） | `SEC...` |
 
-> `CI_JOB_TOKEN`、`CI_PROJECT_ID`、`CI_COMMIT_SHA` 由 GitLab 自动注入，无需手动配置。
+> `CI_COMMIT_SHA`、`CI_COMMIT_BEFORE_SHA` 由 GitLab 自动注入，无需手动配置。
 
 ---
 
 ### 第二步：在 `.gitlab-ci.yml` 中添加审查 Job
 
-#### 方式一：审查当前 commit（推荐）
+#### 方式一：自动审查 push 中的所有 commit（推荐）
 
 ```yaml
 ai-code-review:
   stage: review
   image: ghcr.io/milesians/air/air:latest-snapshot
   variables:
-    CLAUDE_WORK_DIR: $CI_PROJECT_DIR
+    AIR_WORK_DIR: $CI_PROJECT_DIR
   script:
-    - air --commit $CI_COMMIT_SHA
+    - air
   rules:
     - if: $CI_PIPELINE_SOURCE == "push"
   allow_failure: true  # 审查失败不阻断流水线
 ```
 
-#### 方式二：在已有流水线末尾追加
+#### 方式二：只审查指定 commit
 
 ```yaml
-stages:
-  - build
-  - test
-  - review   # 新增
-
 ai-code-review:
   stage: review
   image: ghcr.io/milesians/air/air:latest-snapshot
   variables:
-    CLAUDE_WORK_DIR: $CI_PROJECT_DIR
+    AIR_WORK_DIR: $CI_PROJECT_DIR
   script:
     - air --commit $CI_COMMIT_SHA
   rules:
     - if: $CI_PIPELINE_SOURCE == "push"
-      when: always
   allow_failure: true
 ```
 
@@ -71,13 +65,19 @@ GitLab Push
 CI Job 启动（挂载代码仓库）
     │
     ▼
-air --commit <SHA>
+air [--commit <SHA>]
     │
-    ├─ CI 模式（有 CI_JOB_TOKEN）
-    │   └─ Claude Code 用 git diff-tree / git show 直接读取变更
+    ├─ 无参数（CI 模式）
+    │   ├─ 正常 push: git log $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA 获取 commit 列表
+    │   └─ 首次/force push: 降级为只审查 $CI_COMMIT_SHA
     │
-    └─ 本地模式（无 CI_JOB_TOKEN）
-        └─ 调用 GitLab API 获取 diff，再交给 Claude 审查
+    └─ --commit <SHA>（手动模式）
+        └─ 审查指定的单个 commit
+    │
+    ▼
+commit 数量 ≤ 上限？
+    ├─ 是: Claude 逐个 git show 审查每个 commit
+    └─ 否: Claude 审查 before..after 整体 diff
     │
     ▼
 结构化审查结果（JSON）
@@ -93,27 +93,27 @@ air --commit <SHA>
 | 变量名 | 必填 | 说明 |
 |--------|------|------|
 | `OPENAI_BASE_URL` | ✅ | API 地址（会映射到 `ANTHROPIC_BASE_URL`） |
-| `OPENAI_API_KEY` | ✅ | API 密钥（会映射到 `ANTHROPIC_API_KEY`） |
+| `OPENAI_API_KEY` | ✅ | API 密钥（会映射到 `ANTHROPIC_AUTH_TOKEN`） |
 | `OPENAI_MODEL` | ✅ | 模型名称，同时设置所有 Claude 模型别名 |
 | `DINGTALK_WEBHOOK_URL` | ✅ | 钉钉机器人 Webhook |
 | `DINGTALK_WEBHOOK_SECRET` | — | 钉钉机器人加签密钥 |
-| `CLAUDE_WORK_DIR` | — | 代码仓库路径，CI 中设为 `$CI_PROJECT_DIR` |
-| `CLAUDE_MAX_TURNS` | — | Claude 最大对话轮数，默认 25 |
-| `CI_JOB_TOKEN` | — | GitLab 自动注入，有此变量时进入 CI 模式 |
-| `CI_PROJECT_ID` | — | GitLab 自动注入 |
-| `GITLAB_URL` | — | 本地模式下的 GitLab 地址 |
-| `GITLAB_PRIVATE_TOKEN` | — | 本地模式下的 GitLab 认证 token |
+| `AIR_WORK_DIR` | — | 代码仓库路径，CI 中设为 `$CI_PROJECT_DIR`（命令行 `--work-dir` 优先） |
+| `AIR_MAX_COMMITS` | — | commit 数量上限，超过时降级为整体 diff 审查，默认 10 |
+| `CLAUDE_MAX_TURNS` | — | Claude 最大对话轮数，默认 10 |
+| `CI_COMMIT_SHA` | — | GitLab 自动注入，CI 模式必需 |
+| `CI_COMMIT_BEFORE_SHA` | — | GitLab 自动注入，用于确定 push 范围 |
 
-> 也可以直接使用 `ANTHROPIC_BASE_URL` / `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL`，`OPENAI_*` 变量是兼容别名。
+> 也可以直接使用 `ANTHROPIC_BASE_URL` / `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_MODEL`，`OPENAI_*` 变量是兼容别名。
 
 ---
 
 ## 命令行参数
 
 ```
-air --commit <SHA>    # 审查指定 commit
-air --mr <IID>        # 审查指定 MR（预留）
-air --debug           # 开启 Debug 日志
+air                                    # CI 模式，自动检测 push 中的 commit 范围
+air --commit <SHA>                     # 审查指定的单个 commit
+air --commit <SHA> --work-dir /path    # 指定工作目录
+air --debug                            # 开启 Debug 日志
 ```
 
 ---
@@ -148,9 +148,9 @@ uv sync
 
 # 复制环境变量模板并填写配置
 cp .env.example .env
-# 编辑 .env，填入 API 地址、密钥、GitLab 信息等
+# 编辑 .env，填入 API 地址、密钥等
 
-# 本地运行（本地模式，需配置 GitLab 相关变量）
+# 本地运行
 uv run python -m air --commit <SHA>
 uv run python -m air --commit <SHA> --debug
 ```
@@ -162,22 +162,34 @@ uv run python -m air --commit <SHA> --debug
 #### 准备工作
 
 1. 复制 `.env.example` 为 `.env` 并填写配置
-2. 准备待审查的代码仓库路径，设置 `REPO_PATH` 和 `COMMIT_SHA`：
+2. 准备待审查的代码仓库路径，设置 `REPO_PATH`：
 
 ```bash
 # .env 中设置
 REPO_PATH=/path/to/your/repo    # 待审查的 git 仓库路径
-COMMIT_SHA=abc1234               # 要审查的 commit SHA
 ```
 
-#### 一键运行审查
+#### 审查单个 commit
 
 ```bash
-# 使用 docker compose 直接运行审查（默认命令）
+# 默认命令：审查指定 commit
 docker compose up --build
 
-# 或指定 commit
+# 或指定 commit SHA
 COMMIT_SHA=abc1234 docker compose up --build
+```
+
+#### 模拟 CI push（多 commit 审查）
+
+```bash
+# 设置 CI 环境变量，模拟一次 push 中包含多个 commit
+CI_COMMIT_BEFORE_SHA=<push前SHA> CI_COMMIT_SHA=<push后SHA> \
+  docker compose run --rm air uv run air
+
+# 模拟首次 push（before_sha 为全零，降级为单 commit）
+CI_COMMIT_BEFORE_SHA=0000000000000000000000000000000000000000 \
+  CI_COMMIT_SHA=abc1234 \
+  docker compose run --rm air uv run air
 ```
 
 #### 交互式调试
@@ -188,6 +200,7 @@ docker compose run --rm air bash
 
 # 容器内可直接运行
 uv run air --commit <SHA> --debug
+uv run air   # 需设置 CI_COMMIT_SHA / CI_COMMIT_BEFORE_SHA
 ```
 
 #### Docker 开发镜像说明
@@ -220,7 +233,7 @@ pyright
 
 项目通过 GitHub Actions 自动构建和发布（`.github/workflows/release.yml`）：
 
-1. **触发条件**：推送到 `main` 分支（忽略 `.md` 文件变更）
+1. **触发条件**：推送到 `main` 分支
 2. **build-binary**：使用 PyInstaller 编译 Linux amd64 二进制
 3. **build-docker**：将二进制打包到 Docker 镜像，推送到 GitHub Container Registry（`ghcr.io`）
 

@@ -7,6 +7,7 @@ class ReviewIssue(BaseModel):
     line: int = 0
     severity: str  # error, warning, info
     message: str
+    commiter: str
 
 
 class ReviewResult(BaseModel):

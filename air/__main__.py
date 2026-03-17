@@ -3,6 +3,7 @@ import asyncio
 import logging
 
 from air.air import main
+from air.config import AppConfig
 from air.target import ReviewTarget
 
 
@@ -30,9 +31,19 @@ def parse_args() -> argparse.Namespace:
         help="开启 Debug 日志模式",
     )
 
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("--commit", "-c", metavar="SHA", help="指定 commit SHA")
-    group.add_argument("--mr", "-m", metavar="IID", help="指定 MR IID（预留）")
+    parser.add_argument(
+        "--work-dir",
+        "-w",
+        metavar="PATH",
+        help="工作目录，优先级高于环境变量 AIR_WORK_DIR",
+    )
+
+    parser.add_argument(
+        "--commit",
+        "-c",
+        metavar="SHA",
+        help="指定单个 commit SHA（不指定则从 CI 环境变量自动检测）",
+    )
 
     return parser.parse_args()
 
@@ -41,8 +52,14 @@ def main_sync() -> None:
     args = parse_args()
     setup_logging(args.debug)
 
-    target = ReviewTarget("commit", args.commit) if args.commit else ReviewTarget("mr", args.mr)
-    asyncio.run(main(target))
+    config = AppConfig(work_dir=args.work_dir)
+
+    if args.commit:
+        target = ReviewTarget.from_commit(args.commit)
+    else:
+        target = ReviewTarget.from_gitlab_ci(work_dir=config.work_dir)
+
+    asyncio.run(main(target, config))
 
 
 if __name__ == "__main__":

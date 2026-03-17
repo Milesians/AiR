@@ -12,18 +12,11 @@ from air.channel import DingtalkChannel
 logger = logging.getLogger(__name__)
 
 
-async def main(target: ReviewTarget) -> None:
-    logger.info("AiR 启动：kind=%s, ref=%s", target.kind, target.ref)
+async def main(target: ReviewTarget, config: AppConfig) -> None:
+    logger.info("AiR 启动：%d 个 commit, after_sha=%s", len(target.commits), target.after_sha)
 
-    config = AppConfig()
     reviewer = CodeReviewer(config)
-
-    if config.is_ci:
-        logger.info("运行模式：CI（通过 git 命令获取变更）")
-        result = await reviewer.review_in_ci(target)
-    else:
-        logger.info("运行模式：本地（通过 GitLab API 获取变更）")
-        result = await reviewer.review_in_local(target)
+    result = await reviewer.review(target)
 
     logger.info("审查结束，开始推送结果：issues=%d", len(result.issues))
     ok = DingtalkChannel(config).send(result)
