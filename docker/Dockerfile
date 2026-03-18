@@ -35,8 +35,7 @@ ENV PATH="/opt/jdtls/bin:${PATH}"
 
 # 安装 Claude Code
 RUN npm install -g @anthropic-ai/claude-code
-
-
+RUN claude install
 # 复制预编译的二进制（由 CI 编译后放入 dist/）
 COPY dist/air /usr/local/bin/air
 RUN chmod +x /usr/local/bin/air
@@ -57,3 +56,5 @@ RUN test -f /home/air/.claude.json || echo '{}' > /home/air/.claude.json; chown 
 
 USER air
 WORKDIR /home/air
+RUN claude plugin marketplace add https://github.com/anthropics/claude-plugins-official --scope user
+RUN claude plugin install jdtls-lsp@claude-plugins-official --scope user
