@@ -45,23 +45,16 @@ RUN useradd -m -s /bin/bash air
 USER air
 WORKDIR /home/air/app
 
-# 初始化 Claude Code 用户配置，安装 jdtls plugin
-# 安装完成后删除 extraKnownMarketplaces，避免 claude 启动时访问 GitHub 验证插件导致超时
+# 初始化 Claude Code 用户配置
 RUN claude install
-#    && claude plugin marketplace add https://github.com/anthropics/claude-plugins-official \
-#    && claude plugin install jdtls-lsp@claude-plugins-official \
-#    && jq 'del(.extraKnownMarketplaces)' ~/.claude/settings.json > /tmp/settings.json \
-#    && mv /tmp/settings.json ~/.claude/settings.json
 
-# 安装依赖（含项目本身，生成 .venv/bin/air 入口）
 # 将 preset 目录下的 skills/commands/agents 合并到用户目录供 Claude Code 识别
 COPY --chown=air:air prese[t]/ /home/air/.claude/
 
-# 复制项目源码
+# 复制项目源码并安装依赖（含项目本身，生成 .venv/bin/air 入口）
 COPY --chown=air:air pyproject.toml uv.lock /home/air/app/
 COPY --chown=air:air air/ /home/air/app/air/
-
 RUN uv sync
+
 ENV PATH="/home/air/app/.venv/bin:${PATH}"
-
-
+ENV CLAUDE_CLI_PATH=/usr/local/bin/claude

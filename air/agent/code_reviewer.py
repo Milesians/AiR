@@ -97,6 +97,7 @@ class CodeReviewer:
     def _build_options(self) -> ClaudeAgentOptions:
         """构建 Claude Agent 配置"""
         return ClaudeAgentOptions(
+            cli_path=self.config.claude_cli_path,
             system_prompt=SystemPromptPreset(type="preset", preset="claude_code"),
             allowed_tools=["*"],
             permission_mode="bypassPermissions",

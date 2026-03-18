@@ -74,6 +74,7 @@ docker compose build && docker compose run --rm air air --commit HEAD --debug
 | `DINGTALK_WEBHOOK_SECRET` | — | 钉钉机器人加签密钥 |
 | `AIR_WORK_DIR` | — | 代码仓库路径，CI 中设为 `$CI_PROJECT_DIR`（命令行 `--work-dir` 优先） |
 | `AIR_MAX_COMMITS` | — | commit 数量上限，超过时降级为整体 diff 审查，默认 10 |
+| `CLAUDE_CLI_PATH` | — | Claude Code CLI 路径，默认使用 bundled 版本（Docker 镜像中固定为 `/usr/local/bin/claude`） |
 | `CLAUDE_MAX_TURNS` | — | Claude 最大对话轮数，默认 10 |
 | `CI_COMMIT_SHA` | — | GitLab 自动注入，CI 模式必需 |
 | `CI_COMMIT_BEFORE_SHA` | — | GitLab 自动注入，用于确定 push 范围 |

@@ -39,6 +39,8 @@ class AppConfig:
     default_factory=lambda: int(os.getenv("AIR_MAX_COMMITS", "10")))
 
   # Claude
+  claude_cli_path: str | None = field(
+    default_factory=lambda: os.getenv("CLAUDE_CLI_PATH"))
   claude_max_turns: int = field(
     default_factory=lambda: int(os.getenv("CLAUDE_MAX_TURNS", "30")))
 
