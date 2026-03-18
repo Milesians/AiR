@@ -56,5 +56,5 @@ RUN test -f /home/air/.claude.json || echo '{}' > /home/air/.claude.json; chown 
 
 USER air
 WORKDIR /home/air
-RUN claude plugin marketplace add https://github.com/anthropics/claude-plugins-official --scope user
-RUN claude plugin install jdtls-lsp@claude-plugins-official --scope user
+RUN /usr/local/bin/claude plugin marketplace add https://github.com/anthropics/claude-plugins-official --scope user
+RUN /usr/local/bin/claude plugin install jdtls-lsp@claude-plugins-official --scope user
