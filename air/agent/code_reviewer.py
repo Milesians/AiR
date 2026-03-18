@@ -110,4 +110,8 @@ class CodeReviewer:
                 "type": "json_schema",
                 "schema": ReviewResult.model_json_schema(),
             },
+            env={
+                "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+                "DO_NOT_TRACK": "1",
+            },
         )

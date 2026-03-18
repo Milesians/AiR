@@ -57,4 +57,3 @@ COPY --chown=air:air air/ /home/air/app/air/
 RUN uv sync
 
 ENV PATH="/home/air/app/.venv/bin:${PATH}"
-ENV CLAUDE_CLI_PATH=/usr/local/bin/claude
