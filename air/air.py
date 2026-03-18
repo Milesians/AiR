@@ -19,7 +19,7 @@ async def main(target: ReviewTarget, config: AppConfig) -> None:
     result = await reviewer.review(target)
 
     logger.info("审查结束，开始推送结果：issues=%d", len(result.issues))
-    ok = DingtalkChannel(config).send(result)
+    ok = DingtalkChannel(config).send(result, target)
     if ok:
         logger.info("结果推送完成")
     else:

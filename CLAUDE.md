@@ -33,6 +33,9 @@ uv run pyinstaller air.spec --distpath dist/
 
 # Docker 开发
 docker compose run --rm air bash   # 交互式调试
+
+# 快捷测试（Docker 构建 + 审查最新 commit + 推送钉钉）
+docker compose build && docker compose run --rm air uv run air --commit HEAD --debug
 ```
 
 ## 项目架构
@@ -52,13 +55,13 @@ docker compose run --rm air bash   # 交互式调试
 
 | 模块 | 职责 |
 |------|------|
-| `air/target.py` | `ReviewTarget` dataclass，含 `commits` 列表、`before_sha`、`after_sha`；工厂方法 `from_env()` 从 CI 环境变量构建、`from_commit(sha)` 从单个 commit 构建 |
+| `air/target.py` | `CommitInfo` dataclass（sha、short_sha、author、date、subject）；`ReviewTarget` dataclass，含 `commits` 列表、`before_sha`、`after_sha`、`commit_infos`；工厂方法 `from_gitlab_ci()` 从 CI 环境变量构建、`from_commit(sha)` 从单个 commit 构建 |
 | `air/config/__init__.py` | `AppConfig` dataclass；从环境变量加载配置，`OPENAI_*` 自动映射为 `ANTHROPIC_*` |
 | `air/agent/code_reviewer.py` | `CodeReviewer` — 调用 `claude_agent_sdk.query()`，统一 `review(target)` 方法，根据 commit 数量选择 prompt 模板 |
-| `air/data/review_result.py` | Pydantic 模型：`ReviewResult`（含 `summary` 和 `issues` 列表）、`ReviewIssue`（`file_path`, `line`, `severity`, `message`, `commiter`） |
+| `air/data/review_result.py` | Pydantic 模型：`ReviewResult`（含 `summary` 和 `issues` 列表）、`ReviewIssue`（`file_path`, `start_line`, `end_line`, `severity`, `message`, `original_code`, `suggested_code`） |
 | `air/prompts/` | Prompt 模板目录，`load_prompt(name)` 加载 `.md` 模板文件；包含 `review_commits.md` 和 `review_diff.md` |
 | `air/channel/base.py` | `Channel` 抽象基类，`send(result) -> bool` |
-| `air/channel/dingtalk.py` | `DingtalkChannel` — 将结果格式化为 Markdown 后 POST 到钉钉 Webhook，支持加签 |
+| `air/channel/dingtalk.py` | `DingtalkChannel` — 将结果格式化为 Markdown（含提交信息、总结、问题列表）后 POST 到钉钉 Webhook，支持加签 |
 
 ### 扩展指引
 

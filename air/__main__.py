@@ -55,7 +55,7 @@ def main_sync() -> None:
     config = AppConfig(work_dir=args.work_dir)
 
     if args.commit:
-        target = ReviewTarget.from_commit(args.commit)
+        target = ReviewTarget.from_commit(args.commit, work_dir=config.work_dir)
     else:
         target = ReviewTarget.from_gitlab_ci(work_dir=config.work_dir)
 

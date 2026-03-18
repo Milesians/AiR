@@ -124,7 +124,7 @@ air --debug                            # 开启 Debug 日志
 2. 安全设置选择「加签」，记录 Secret
 3. 将 Webhook 地址填入 `DINGTALK_WEBHOOK_URL`，Secret 填入 `DINGTALK_WEBHOOK_SECRET`
 
-审查结果将以 Markdown 格式发送，包含总结和问题列表（按 error / warning / info 分级）。
+审查结果将以 Markdown 格式发送，包含涉及的提交信息（提交哈希、提交人、提交时间）、总结和问题列表（按 error / warning / info 分级）。
 
 ---
 
@@ -167,6 +167,13 @@ uv run python -m air --commit <SHA> --debug
 ```bash
 # .env 中设置
 REPO_PATH=/path/to/your/repo    # 待审查的 git 仓库路径
+```
+
+#### 快捷测试
+
+```bash
+# 构建镜像 + 审查最新 commit + 推送钉钉（含 debug 日志）
+docker compose build && docker compose run --rm air uv run air --commit HEAD --debug
 ```
 
 #### 审查单个 commit
