@@ -46,9 +46,9 @@ USER air
 WORKDIR /home/air/app
 
 # 初始化 Claude Code 用户配置，安装 jdtls plugin
-RUN claude install \
-    && claude plugin marketplace add https://github.com/anthropics/claude-plugins-official \
-    && claude plugin install jdtls-lsp@claude-plugins-official
+RUN claude install
+#    && claude plugin marketplace add https://github.com/anthropics/claude-plugins-official \
+#    && claude plugin install jdtls-lsp@claude-plugins-official
 
 # 安装依赖（含项目本身，生成 .venv/bin/air 入口）
 # 将 preset 目录下的 skills/commands/agents 合并到用户目录供 Claude Code 识别

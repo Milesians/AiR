@@ -100,7 +100,7 @@ class CodeReviewer:
             system_prompt=SystemPromptPreset(type="preset", preset="claude_code"),
             allowed_tools=["*"],
             permission_mode="bypassPermissions",
-            setting_sources=["user"],
+            setting_sources=[],
             cwd=self.config.work_dir,
             max_turns=self.config.claude_max_turns,
             thinking=ThinkingConfigDisabled(type="disabled"),

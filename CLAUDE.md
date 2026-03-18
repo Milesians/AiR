@@ -13,12 +13,12 @@ CI/CD 流水线中的自动代码审查工具，使用 `claude-agent-sdk` 对 Gi
 uv sync
 
 # 运行（需先配置环境变量，参考 .env.example）
-uv run python -m air --commit <SHA>
-uv run python -m air --commit <SHA> --debug
-uv run python -m air --commit <SHA> --work-dir /path/to/repo
+uv run air --commit <SHA>
+uv run air --commit <SHA> --debug
+uv run air --commit <SHA> --work-dir /path/to/repo
 
 # CI 模式（自动检测 push 范围，需设置 CI_COMMIT_BEFORE_SHA 和 CI_COMMIT_SHA）
-uv run python -m air
+uv run air
 
 # 或使用安装后的命令
 air --commit <SHA>

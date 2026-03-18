@@ -151,8 +151,8 @@ cp .env.example .env
 # 编辑 .env，填入 API 地址、密钥等
 
 # 本地运行
-uv run python -m air --commit <SHA>
-uv run python -m air --commit <SHA> --debug
+uv run air --commit <SHA>
+uv run air --commit <SHA> --debug
 ```
 
 ### Docker 环境调试
