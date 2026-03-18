@@ -46,9 +46,12 @@ USER air
 WORKDIR /home/air/app
 
 # 初始化 Claude Code 用户配置，安装 jdtls plugin
+# 安装完成后删除 extraKnownMarketplaces，避免 claude 启动时访问 GitHub 验证插件导致超时
 RUN claude install
 #    && claude plugin marketplace add https://github.com/anthropics/claude-plugins-official \
-#    && claude plugin install jdtls-lsp@claude-plugins-official
+#    && claude plugin install jdtls-lsp@claude-plugins-official \
+#    && jq 'del(.extraKnownMarketplaces)' ~/.claude/settings.json > /tmp/settings.json \
+#    && mv /tmp/settings.json ~/.claude/settings.json
 
 # 安装依赖（含项目本身，生成 .venv/bin/air 入口）
 # 将 preset 目录下的 skills/commands/agents 合并到用户目录供 Claude Code 识别
