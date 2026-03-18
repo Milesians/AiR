@@ -30,6 +30,7 @@ class ReviewTarget:
     @staticmethod
     def from_commit(sha: str, work_dir: str | None = None) -> "ReviewTarget":
         """从单个 commit 构建审查目标"""
+        _git_safe_directory(work_dir)
         logger.info("从单个 commit 构建审查目标：%s", sha)
         infos = _git_commit_infos([sha], work_dir)
         return ReviewTarget(commits=[sha], after_sha=sha, commit_infos=infos)
@@ -41,6 +42,7 @@ class ReviewTarget:
         使用 CI_COMMIT_BEFORE_SHA 和 CI_COMMIT_SHA 确定 push 范围，
         通过 git log 获取 commit 列表。
         """
+        _git_safe_directory(work_dir)
         after_sha = os.getenv("CI_COMMIT_SHA", "")
         before_sha = os.getenv("CI_COMMIT_BEFORE_SHA", "")
 
@@ -65,6 +67,17 @@ class ReviewTarget:
         logger.info("检测到 %d 个 commit", len(commits))
         infos = _git_commit_infos(commits, work_dir)
         return ReviewTarget(commits=commits, before_sha=before_sha, after_sha=after_sha, commit_infos=infos)
+
+
+def _git_safe_directory(work_dir: str | None = None) -> None:
+    """将工作目录加入 git safe.directory，解决 CI 环境中目录所有者不一致的问题"""
+    target_dir = work_dir or os.getcwd()
+    cmd = ["git", "config", "--global", "--add", "safe.directory", target_dir]
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+        logger.debug("已将 %s 加入 git safe.directory", target_dir)
+    except subprocess.CalledProcessError as e:
+        logger.warning("设置 safe.directory 失败：%s", e.stderr.strip())
 
 
 def _git_log_range(before_sha: str, after_sha: str, work_dir: str | None = None) -> list[str]:
