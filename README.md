@@ -157,7 +157,7 @@ uv run python -m air --commit <SHA> --debug
 
 ### Docker 环境调试
 
-项目提供了基于 `docker-compose.yml` 的开发环境，使用 `docker/Dockerfile-dev` 镜像（包含 uv + 源码），方便在容器内模拟 CI 环境进行调试。
+项目提供了基于 `docker-compose.yml` 的开发环境，使用与生产相同的 `docker/Dockerfile` 镜像，方便在容器内模拟 CI 环境进行调试。
 
 #### 准备工作
 
@@ -173,7 +173,7 @@ REPO_PATH=/path/to/your/repo    # 待审查的 git 仓库路径
 
 ```bash
 # 构建镜像 + 审查最新 commit + 推送钉钉（含 debug 日志）
-docker compose build && docker compose run --rm air uv run air --commit HEAD --debug
+docker compose build && docker compose run --rm air air --commit HEAD --debug
 ```
 
 #### 审查单个 commit
@@ -191,12 +191,12 @@ COMMIT_SHA=abc1234 docker compose up --build
 ```bash
 # 设置 CI 环境变量，模拟一次 push 中包含多个 commit
 CI_COMMIT_BEFORE_SHA=<push前SHA> CI_COMMIT_SHA=<push后SHA> \
-  docker compose run --rm air uv run air
+  docker compose run --rm air air
 
 # 模拟首次 push（before_sha 为全零，降级为单 commit）
 CI_COMMIT_BEFORE_SHA=0000000000000000000000000000000000000000 \
   CI_COMMIT_SHA=abc1234 \
-  docker compose run --rm air uv run air
+  docker compose run --rm air air
 ```
 
 #### 交互式调试
@@ -206,8 +206,8 @@ CI_COMMIT_BEFORE_SHA=0000000000000000000000000000000000000000 \
 docker compose run --rm air bash
 
 # 容器内可直接运行
-uv run air --commit <SHA> --debug
-uv run air   # 需设置 CI_COMMIT_SHA / CI_COMMIT_BEFORE_SHA
+air --commit <SHA> --debug
+air   # 需设置 CI_COMMIT_SHA / CI_COMMIT_BEFORE_SHA
 ```
 
 #### Docker 开发镜像说明
@@ -216,17 +216,6 @@ uv run air   # 需设置 CI_COMMIT_SHA / CI_COMMIT_BEFORE_SHA
 - 包含 Java 25 + jdtls（Eclipse JDT Language Server，用于 Claude Code 分析 Java 项目）
 - 通过 `volumes` 将本地代码仓库只读挂载到 `/workspace`
 - 环境变量从 `.env` 文件自动加载
-
-### 编译二进制
-
-```bash
-# 安装开发依赖（包含 pyinstaller）
-uv sync --group dev
-
-# 编译为单文件二进制
-uv run pyinstaller air.spec --distpath dist/
-# 输出：dist/air
-```
 
 ### 类型检查
 
@@ -241,7 +230,6 @@ pyright
 项目通过 GitHub Actions 自动构建和发布（`.github/workflows/release.yml`）：
 
 1. **触发条件**：推送到 `main` 分支
-2. **build-binary**：使用 PyInstaller 编译 Linux amd64 二进制
-3. **build-docker**：将二进制打包到 Docker 镜像，推送到 GitHub Container Registry（`ghcr.io`）
+2. **build-docker**：直接从源码构建 Docker 镜像（使用 uv 安装依赖），推送到 GitHub Container Registry（`ghcr.io`）
 
 镜像标签格式：`ghcr.io/milesians/air/air:YYYYMMDD-<commit_short>` 和 `latest`。

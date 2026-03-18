@@ -2,14 +2,14 @@ services:
   air:
     build:
       context: .
-      dockerfile: docker/Dockerfile-dev
+      dockerfile: docker/Dockerfile
     env_file:
       - .env
     volumes:
       # 挂载待审查的代码仓库
       - ${REPO_PATH}:${AIR_WORK_DIR:-/workspace}:ro
     # 默认命令：审查指定 commit
-    command: ["uv", "run", "air", "--commit", "${COMMIT_SHA:-HEAD}"]
+    command: ["air", "--commit", "${COMMIT_SHA:-HEAD}"]
     # 交互式调试时可覆盖：
     # docker compose run --rm air bash
     stdin_open: true

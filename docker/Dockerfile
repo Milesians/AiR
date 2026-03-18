@@ -16,10 +16,13 @@ RUN apt-get update \
        > /etc/apt/sources.list.d/adoptium.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-       tzdata git curl bash jq openssl gettext-base python3 \
+       tzdata git curl bash jq openssl gettext-base \
        temurin-25-jdk \
     && apt-get purge -y --auto-remove wget apt-transport-https gpg \
     && rm -rf /var/lib/apt/lists/*
+
+# 安装 uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 RUN ln -s "$(dirname $(dirname $(readlink -f /usr/bin/java)))" /usr/lib/jvm/default-jdk
 ENV JAVA_HOME=/usr/lib/jvm/default-jdk
@@ -33,28 +36,29 @@ RUN curl -fsSL "https://download.eclipse.org/jdtls/snapshots/jdt-language-server
     && chmod +x /opt/jdtls/bin/jdtls
 ENV PATH="/opt/jdtls/bin:${PATH}"
 
-# 安装 Claude Code
+# 安装 Claude Code（需 root 写入 /usr/local/lib/node_modules）
 RUN npm install -g @anthropic-ai/claude-code
-RUN claude install
-# 复制预编译的二进制（由 CI 编译后放入 dist/）
-COPY dist/air /usr/local/bin/air
-RUN chmod +x /usr/local/bin/air
-
 
 # 创建非 root 用户，避免 claude --dangerously-skip-permissions 拒绝 root 执行
 RUN useradd -m -s /bin/bash air
 
-# 将基础镜像中 root 的 claude 配置（含 plugin）复制到 air 用户目录
-RUN cp -r /root/.claude /home/air/.claude 2>/dev/null || true
-
-# 将 preset 目录下的 skills/commands/agents 合并到用户目录供 Claude Code 识别
-COPY prese[t]/ /home/air/.claude/
-RUN chown -R air:air /home/air/.claude
-
-# 创建 Claude Code 所需的配置文件
-RUN test -f /home/air/.claude.json || echo '{}' > /home/air/.claude.json; chown air:air /home/air/.claude.json
-
 USER air
-WORKDIR /home/air
-RUN /usr/local/bin/claude plugin marketplace add https://github.com/anthropics/claude-plugins-official --scope user
-RUN /usr/local/bin/claude plugin install jdtls-lsp@claude-plugins-official --scope user
+WORKDIR /home/air/app
+
+# 初始化 Claude Code 用户配置，安装 jdtls plugin
+RUN claude install \
+    && claude plugin marketplace add https://github.com/anthropics/claude-plugins-official \
+    && claude plugin install jdtls-lsp@claude-plugins-official
+
+# 安装依赖（含项目本身，生成 .venv/bin/air 入口）
+# 将 preset 目录下的 skills/commands/agents 合并到用户目录供 Claude Code 识别
+COPY --chown=air:air prese[t]/ /home/air/.claude/
+
+# 复制项目源码
+COPY --chown=air:air pyproject.toml uv.lock /home/air/app/
+COPY --chown=air:air air/ /home/air/app/air/
+
+RUN uv sync
+ENV PATH="/home/air/app/.venv/bin:${PATH}"
+
+

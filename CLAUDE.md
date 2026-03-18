@@ -11,7 +11,6 @@ CI/CD 流水线中的自动代码审查工具，使用 `claude-agent-sdk` 对 Gi
 ```bash
 # 安装依赖（Python >= 3.13）
 uv sync
-uv sync --group dev          # 包含 pyinstaller 等开发依赖
 
 # 运行（需先配置环境变量，参考 .env.example）
 uv run python -m air --commit <SHA>
@@ -28,14 +27,11 @@ air                          # CI 模式，自动检测
 # 类型检查
 pyright
 
-# 编译二进制
-uv run pyinstaller air.spec --distpath dist/
-
 # Docker 开发
 docker compose run --rm air bash   # 交互式调试
 
 # 快捷测试（Docker 构建 + 审查最新 commit + 推送钉钉）
-docker compose build && docker compose run --rm air uv run air --commit HEAD --debug
+docker compose build && docker compose run --rm air air --commit HEAD --debug
 ```
 
 ## 项目架构
@@ -90,8 +86,8 @@ docker compose build && docker compose run --rm air uv run air --commit HEAD --d
 - Claude 集成使用 `claude_agent_sdk.query()` + Pydantic JSON Schema 结构化输出
 - 统一使用 git 命令获取 diff 和上下文，不依赖外部 API
 - 构建后端为 `hatchling`，CLI 入口点定义在 `pyproject.toml` 的 `[project.scripts]`
-- CI/CD 通过 GitHub Actions（`.github/workflows/release.yml`）：PyInstaller 编译 → Docker 镜像推送到 GHCR
-- 生产 Docker 镜像基于 `node:24-slim`（因为需要 Claude Code CLI），包含 Java 25 + jdtls 支持
+- CI/CD 通过 GitHub Actions（`.github/workflows/release.yml`）：直接构建 Docker 镜像推送到 GHCR（无需 PyInstaller 编译步骤）
+- Docker 镜像基于 `node:24-slim`（因为需要 Claude Code CLI），包含 Java 25 + jdtls 支持；开发与生产共用同一个 `docker/Dockerfile`
 
 ## 开发规范
 
