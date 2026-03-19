@@ -45,9 +45,6 @@ RUN useradd -m -s /bin/bash air
 USER air
 WORKDIR /home/air/app
 
-# 初始化 Claude Code 用户配置
-RUN claude install
-
 # 将 preset 目录下的 skills/commands/agents 合并到用户目录供 Claude Code 识别
 COPY --chown=air:air prese[t]/ /home/air/.claude/
 

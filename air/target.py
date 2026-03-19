@@ -51,9 +51,9 @@ class ReviewTarget:
 
         logger.info("CI 环境检测：before=%s, after=%s", before_sha or "(未设置)", after_sha)
 
-        # 首次 push 或 force push：before_sha 为全零或未设置
-        if not before_sha or before_sha == _ZERO_SHA:
-            logger.info("首次 push 或 force push，降级为单 commit 审查")
+        # 首次 push、force push（全零）或 before == after：降级为单 commit 审查
+        if not before_sha or before_sha == _ZERO_SHA or before_sha == after_sha:
+            logger.info("首次 push / force push / before==after，降级为单 commit 审查")
             infos = _git_commit_infos([after_sha], work_dir)
             return ReviewTarget(commits=[after_sha], after_sha=after_sha, commit_infos=infos)
 

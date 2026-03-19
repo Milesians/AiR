@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 import logging
 import os
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +22,12 @@ if model := os.environ.get("OPENAI_MODEL"):
 
 
 def _mask(value: str, show: int = 4) -> str:
-  """遮盖敏感值，仅显示末尾若干字符"""
+  """遮盖敏感值，显示前后若干字符"""
   if not value:
     return "(未设置)"
-  return f"***{value[-show:]}" if len(value) > show else "***"
+  if len(value) <= show * 2:
+    return "***"
+  return f"{value[:show]}***{value[-show:]}"
 
 
 @dataclass
@@ -38,9 +41,12 @@ class AppConfig:
   max_commits: int = field(
     default_factory=lambda: int(os.getenv("AIR_MAX_COMMITS", "10")))
 
-  # Claude
+  # Claude CLI 路径：环境变量 > PATH 查找 > 默认路径
   claude_cli_path: str | None = field(
-    default_factory=lambda: os.getenv("CLAUDE_CLI_PATH"))
+    default_factory=lambda: os.getenv(
+      "CLAUDE_CLI_PATH",
+      shutil.which("claude") or "/usr/local/bin/claude",
+    ))
   claude_max_turns: int = field(
     default_factory=lambda: int(os.getenv("CLAUDE_MAX_TURNS", "30")))
 
@@ -60,8 +66,16 @@ class AppConfig:
         self.work_dir or "(未设置)",
         self.max_commits,
     )
-    logger.debug(
-        "敏感配置摘要：dingtalk_webhook=%s, dingtalk_secret=%s",
+    logger.info(
+        "Claude 配置：model=%s, base_url=%s, auth_token=%s, cli_path=%s, max_turns=%d",
+        os.getenv("ANTHROPIC_MODEL", "(未设置)"),
+        os.getenv("ANTHROPIC_BASE_URL", "(未设置)"),
+        _mask(os.getenv("ANTHROPIC_AUTH_TOKEN", "")),
+        self.claude_cli_path,
+        self.claude_max_turns,
+    )
+    logger.info(
+        "钉钉配置：webhook=%s, secret=%s",
         _mask(self.dingtalk_webhook_url),
         _mask(self.dingtalk_webhook_secret),
     )
