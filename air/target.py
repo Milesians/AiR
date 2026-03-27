@@ -15,6 +15,7 @@ class CommitInfo:
     sha: str  # 完整 SHA
     short_sha: str  # 短 SHA（前 8 位）
     author: str  # 提交人
+    email: str  # 提交人邮箱
     date: str  # 提交时间（ISO 格式）
     subject: str  # 提交标题
 
@@ -99,7 +100,7 @@ def _git_commit_infos(shas: list[str], work_dir: str | None = None) -> list[Comm
         return []
     # 分隔符不能包含 % 后跟字母，否则会被 git format 解析
     sep = "<|>"
-    fmt = sep.join(["%H", "%h", "%an", "%ai", "%s"])
+    fmt = sep.join(["%H", "%h", "%an", "%ae", "%ai", "%s"])
     cmd = ["git", "log", f"--format={fmt}", "--no-walk", *shas]
     logger.debug("执行命令：%s", " ".join(cmd))
     try:
@@ -110,13 +111,14 @@ def _git_commit_infos(shas: list[str], work_dir: str | None = None) -> list[Comm
             if not line:
                 continue
             parts = line.split(sep)
-            if len(parts) >= 5:
+            if len(parts) >= 6:
                 infos.append(CommitInfo(
                     sha=parts[0],
                     short_sha=parts[1],
                     author=parts[2],
-                    date=parts[3],
-                    subject=parts[4],
+                    email=parts[3],
+                    date=parts[4],
+                    subject=parts[5],
                 ))
         # --no-walk 不保证顺序，按传入的 shas 顺序排列
         sha_order = {sha: i for i, sha in enumerate(shas)}

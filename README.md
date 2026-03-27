@@ -97,6 +97,7 @@ commit 数量 ≤ 上限？
 | `OPENAI_MODEL` | ✅ | 模型名称，同时设置所有 Claude 模型别名 |
 | `DINGTALK_WEBHOOK_URL` | ✅ | 钉钉机器人 Webhook |
 | `DINGTALK_WEBHOOK_SECRET` | — | 钉钉机器人加签密钥 |
+| `AIR_CONTACTS` | — | 联系人配置（JSON），用于钉钉 @mention，详见下方说明 |
 | `AIR_WORK_DIR` | — | 代码仓库路径，CI 中设为 `$CI_PROJECT_DIR`（命令行 `--work-dir` 优先） |
 | `AIR_MAX_COMMITS` | — | commit 数量上限，超过时降级为整体 diff 审查，默认 10 |
 | `CLAUDE_MAX_TURNS` | — | Claude 最大对话轮数，默认 10 |
@@ -125,6 +126,37 @@ air --debug                            # 开启 Debug 日志
 3. 将 Webhook 地址填入 `DINGTALK_WEBHOOK_URL`，Secret 填入 `DINGTALK_WEBHOOK_SECRET`
 
 审查结果将以 Markdown 格式发送，包含涉及的提交信息（提交哈希、提交人、提交时间）、总结和问题列表（按 error / warning / info 分级）。
+
+### 联系人 @mention 配置
+
+通过 `AIR_CONTACTS` 环境变量传入 JSON 格式的联系人列表，钉钉通知会根据提交信息自动 @mention 相关人员：
+
+```json
+{
+    "users": [
+        {
+            "name": "张三",
+            "email": "zhangsan@example.com",
+            "phone": "13800138000",
+            "regex": "zhangsan|张三",
+            "role": "maintainer"
+        },
+        {
+            "name": "李四",
+            "email": "lisi@example.com",
+            "phone": "13900139000",
+            "regex": "lisi",
+            "role": "developer"
+        }
+    ]
+}
+```
+
+**匹配规则：**
+- 用每个联系人的 `regex` 正则表达式匹配提交标题、提交人、提交人邮箱
+- 匹配到则 @mention 该联系人的手机号
+- 没有匹配到任何人时，@mention 所有 `role` 为 `maintainer` 的联系人
+- 未配置 `AIR_CONTACTS` 时输出 warn 日志，不 @mention 任何人
 
 ---
 

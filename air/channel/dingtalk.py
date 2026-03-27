@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import hmac
+import json
 import logging
 import time
 from urllib.parse import urlencode
@@ -8,6 +9,7 @@ from urllib.parse import urlencode
 import requests
 
 from air.config import AppConfig
+from air.data.contacts import AtResult, parse_contacts, resolve_at
 from air.data.review_result import ReviewResult
 from air.target import ReviewTarget
 from .base import Channel
@@ -15,14 +17,19 @@ from .base import Channel
 logger = logging.getLogger(__name__)
 
 
-def _format_message(result: ReviewResult, target: ReviewTarget) -> str:
+def _format_message(result: ReviewResult, target: ReviewTarget, at: AtResult | None = None) -> str:
     lines = ["## Code Review 结果\n"]
 
     # 涉及的提交信息
     if target.commit_infos:
         lines.append("### 涉及提交\n")
         for ci in target.commit_infos:
-            lines.append(f"- `{ci.short_sha}` {ci.subject} — {ci.author}（{ci.date}）\n")
+            line = f"- `{ci.short_sha}` {ci.subject} — {ci.author}（{ci.date}）"
+            # 在提交人后面追加 @手机号
+            if at and ci.sha in at.commit_phones:
+                at_text = " ".join(f"@{phone}" for phone in at.commit_phones[ci.sha])
+                line = f"{line} {at_text}"
+            lines.append(f"{line}\n")
         lines.append("")
 
     if result.summary:
@@ -42,6 +49,11 @@ def _format_message(result: ReviewResult, target: ReviewTarget) -> str:
                 lines.append(f"**问题代码：**\n\n{issue.original_code}\n")
             if issue.suggested_code:
                 lines.append(f"**建议修改：**\n\n{issue.suggested_code}\n")
+
+    # 没有匹配到提交人时，在末尾 @ maintainer
+    if at and at.fallback_phones:
+        at_text = " ".join(f"@{phone}" for phone in at.fallback_phones)
+        lines.append(f"\n> 请相关维护者关注 {at_text}\n")
 
     return "\n".join(lines)
 
@@ -76,13 +88,32 @@ class DingtalkChannel(Channel):
         else:
             logger.debug("未配置签名密钥，使用原始 Webhook URL")
 
-        content = _format_message(result, target)
+        # 解析联系人，构建 @mention
+        at_result: AtResult | None = None
+        if self.config.contacts_json:
+            try:
+                contacts = parse_contacts(self.config.contacts_json)
+                at_result = resolve_at(contacts, target.commit_infos)
+                if at_result.all_phones:
+                    logger.info("钉钉 @mention 手机号：%s", at_result.all_phones)
+            except json.JSONDecodeError:
+                logger.warning("AIR_CONTACTS 环境变量 JSON 格式无效，跳过 @mention")
+        else:
+            logger.warning("AIR_CONTACTS 未配置，跳过 @mention")
+
+        content = _format_message(result, target, at_result)
         logger.debug("钉钉消息完整内容：\n%s", content)
-        payload = {
+
+        at_phones = at_result.all_phones if at_result else []
+        payload: dict = {
             "msgtype": "markdown",
             "markdown": {
                 "title": "Code Review 结果",
                 "text": content
+            },
+            "at": {
+                "atMobiles": at_phones,
+                "isAtAll": False
             }
         }
 

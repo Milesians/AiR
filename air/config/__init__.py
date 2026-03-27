@@ -56,6 +56,10 @@ class AppConfig:
   dingtalk_webhook_secret: str = field(
     default_factory=lambda: os.getenv("DINGTALK_WEBHOOK_SECRET", ""))
 
+  # 联系人配置（JSON 字符串）
+  contacts_json: str = field(
+    default_factory=lambda: os.getenv("AIR_CONTACTS", ""))
+
   def __post_init__(self) -> None:
     # 命令行未传入时，回退到环境变量
     if self.work_dir is None:

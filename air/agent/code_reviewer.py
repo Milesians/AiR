@@ -1,14 +1,13 @@
 import logging
 
-from claude_agent_sdk import query, ClaudeAgentOptions, ResultMessage, \
-    ThinkingConfigDisabled, SystemMessage
-from claude_agent_sdk._errors import ProcessError, MessageParseError
-from claude_agent_sdk.types import SystemPromptPreset, AssistantMessage
-
 from air.config import AppConfig
 from air.data import ReviewResult
 from air.prompts import load_prompt
 from air.target import ReviewTarget
+from claude_agent_sdk import query, ClaudeAgentOptions, ResultMessage, \
+    ThinkingConfigDisabled
+from claude_agent_sdk._errors import ProcessError, MessageParseError
+from claude_agent_sdk.types import SystemPromptPreset
 
 logger = logging.getLogger(__name__)
 
@@ -65,26 +64,27 @@ class CodeReviewer:
         try:
             async for message in query(prompt=prompt,
                                        options=self._build_options()):
-                logger.debug("收到消息：%s \n %s", type(message).__name__,
-                             message)
-
-
-                if isinstance(message, SystemMessage):
-                    logger.info("收到系统消息：%s",
+                logger.info("收到[%s]消息：\n %s", type(message).__name__,
                             message)
-
-                if isinstance(message,AssistantMessage):
-                    logger.info("收到助手消息：%s",
-                            message)
-
 
                 if not isinstance(message, ResultMessage):
                     continue
+
+                usage = message.usage or {}
+                logger.info("Usage 原始数据：%s", usage)
+                logger.info(
+                    "审查统计：cost=$%.4f, turns=%d, duration=%dms (api=%dms)",
+                    message.total_cost_usd or 0,
+                    message.num_turns,
+                    message.duration_ms,
+                    message.duration_api_ms,
+                )
 
                 result = _parse_result_message(message)
 
             if result is None:
                 return ReviewResult(summary="审查完成，但未收到结果。")
+
             return result
         except (ProcessError, MessageParseError) as e:
             logger.error("Claude 调用失败：%s", e)

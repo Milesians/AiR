@@ -51,13 +51,14 @@ docker compose build && docker compose run --rm air air --commit HEAD --debug
 
 | 模块 | 职责 |
 |------|------|
-| `air/target.py` | `CommitInfo` dataclass（sha、short_sha、author、date、subject）；`ReviewTarget` dataclass，含 `commits` 列表、`before_sha`、`after_sha`、`commit_infos`；工厂方法 `from_gitlab_ci()` 从 CI 环境变量构建、`from_commit(sha)` 从单个 commit 构建 |
+| `air/target.py` | `CommitInfo` dataclass（sha、short_sha、author、email、date、subject）；`ReviewTarget` dataclass，含 `commits` 列表、`before_sha`、`after_sha`、`commit_infos`；工厂方法 `from_gitlab_ci()` 从 CI 环境变量构建、`from_commit(sha)` 从单个 commit 构建 |
 | `air/config/__init__.py` | `AppConfig` dataclass；从环境变量加载配置，`OPENAI_*` 自动映射为 `ANTHROPIC_*` |
 | `air/agent/code_reviewer.py` | `CodeReviewer` — 调用 `claude_agent_sdk.query()`，统一 `review(target)` 方法，根据 commit 数量选择 prompt 模板 |
 | `air/data/review_result.py` | Pydantic 模型：`ReviewResult`（含 `summary` 和 `issues` 列表）、`ReviewIssue`（`file_path`, `start_line`, `end_line`, `severity`, `message`, `original_code`, `suggested_code`） |
 | `air/prompts/` | Prompt 模板目录，`load_prompt(name)` 加载 `.md` 模板文件；包含 `review_commits.md` 和 `review_diff.md` |
 | `air/channel/base.py` | `Channel` 抽象基类，`send(result) -> bool` |
-| `air/channel/dingtalk.py` | `DingtalkChannel` — 将结果格式化为 Markdown（含提交信息、总结、问题列表）后 POST 到钉钉 Webhook，支持加签 |
+| `air/data/contacts.py` | `Contact` dataclass（email、phone、regex、role）；`parse_contacts()` 从 JSON 解析联系人；`resolve_at_phones()` 根据 commit 信息匹配联系人手机号 |
+| `air/channel/dingtalk.py` | `DingtalkChannel` — 将结果格式化为 Markdown（含提交信息、总结、问题列表）后 POST 到钉钉 Webhook，支持加签和 @mention |
 
 ### 扩展指引
 
@@ -72,6 +73,7 @@ docker compose build && docker compose run --rm air air --commit HEAD --debug
 | `OPENAI_MODEL` | ✅ | 模型名称（同时设置所有 Claude 模型别名） |
 | `DINGTALK_WEBHOOK_URL` | ✅ | 钉钉机器人 Webhook 地址 |
 | `DINGTALK_WEBHOOK_SECRET` | — | 钉钉机器人加签密钥 |
+| `AIR_CONTACTS` | — | 联系人配置（JSON），用于钉钉 @mention，根据 regex 匹配提交人，未匹配则 @maintainer |
 | `AIR_WORK_DIR` | — | 代码仓库路径，CI 中设为 `$CI_PROJECT_DIR`（命令行 `--work-dir` 优先） |
 | `AIR_MAX_COMMITS` | — | commit 数量上限，超过时降级为整体 diff 审查，默认 10 |
 | `CLAUDE_CLI_PATH` | — | Claude Code CLI 路径，默认使用 bundled 版本（Docker 镜像中固定为 `/usr/local/bin/claude`） |
