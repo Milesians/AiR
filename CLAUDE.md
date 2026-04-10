@@ -89,7 +89,8 @@ docker compose build && docker compose run --rm air air --commit HEAD --debug
 - Claude 集成使用 `claude_agent_sdk.query()` + Pydantic JSON Schema 结构化输出
 - 统一使用 git 命令获取 diff 和上下文，不依赖外部 API
 - 构建后端为 `hatchling`，CLI 入口点定义在 `pyproject.toml` 的 `[project.scripts]`
-- CI/CD 通过 GitHub Actions（`.github/workflows/release.yml`）：直接构建 Docker 镜像推送到 GHCR（无需 PyInstaller 编译步骤）
+- CI/CD 通过 GitHub Actions（`.github/workflows/release.yml`）：在推送 Git Tag 时触发，按 Tag 名构建并推送 Docker 镜像到 GHCR，同时自动发布对应 GitHub Release（无需 PyInstaller 编译步骤）
+- Dependabot 使用 `groups` 将 `uv` 依赖按周聚合到单个 PR（配置见 `.github/dependabot.yml`）
 - Docker 镜像基于 `node:24-slim`（因为需要 Claude Code CLI），包含 Java 25 + jdtls 支持；开发与生产共用同一个 `docker/Dockerfile`
 
 ## 开发规范

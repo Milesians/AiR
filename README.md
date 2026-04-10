@@ -261,7 +261,12 @@ pyright
 
 项目通过 GitHub Actions 自动构建和发布（`.github/workflows/release.yml`）：
 
-1. **触发条件**：推送到 `main` 分支
+1. **触发条件**：向仓库推送 Git Tag 时触发（例如在分支上执行 `git tag v1.0.0 && git push origin v1.0.0`）
 2. **build-docker**：直接从源码构建 Docker 镜像（使用 uv 安装依赖），推送到 GitHub Container Registry（`ghcr.io`）
+3. **release**：基于该 Tag 自动发布 GitHub Release（自动生成发布说明）
 
-镜像标签格式：`ghcr.io/milesians/air/air:YYYYMMDD-<commit_short>` 和 `latest`。
+镜像标签格式：`ghcr.io/milesians/air/air:<tag>`（例如 `ghcr.io/milesians/air/air:v1.0.0`）。
+
+### 依赖升级策略（Dependabot）
+
+- `.github/dependabot.yml` 对 `uv` 生态配置了 `groups`，每轮检查会将匹配到的依赖升级聚合在同一个 PR 中，而不是按依赖分别创建多个 PR。
