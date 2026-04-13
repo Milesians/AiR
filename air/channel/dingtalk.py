@@ -17,45 +17,50 @@ from .base import Channel
 logger = logging.getLogger(__name__)
 
 
-def _format_message(result: ReviewResult, target: ReviewTarget, at: AtResult | None = None) -> str:
-    lines = ["## Code Review 结果\n"]
+def _extract_title(body: str) -> str:
+    """从 Agent 正文中提取钉钉消息标题。"""
+    for line in body.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        title = stripped.lstrip("#").strip()
+        return title or "Code Review 结果"
+    return "Code Review 结果"
+
+
+def _format_message(
+    result: ReviewResult,
+    target: ReviewTarget,
+    project_name: str,
+    at: AtResult | None = None,
+) -> str:
+    sections: list[str] = []
+
+    if project_name.strip():
+        sections.append(f"### 项目\n\n`{project_name.strip()}`")
 
     # 涉及的提交信息
     if target.commit_infos:
-        lines.append("### 涉及提交\n")
+        lines = ["### 涉及提交", ""]
         for ci in target.commit_infos:
             line = f"- `{ci.short_sha}` {ci.subject} — {ci.author}（{ci.date}）"
             # 在提交人后面追加 @手机号
             if at and ci.sha in at.commit_phones:
                 at_text = " ".join(f"@{phone}" for phone in at.commit_phones[ci.sha])
                 line = f"{line} {at_text}"
-            lines.append(f"{line}\n")
-        lines.append("")
+            lines.append(line)
+        sections.append("\n".join(lines).strip())
 
-    if result.summary:
-        lines.append(f"{result.summary}\n")
-
-    if result.issues:
-        lines.append("### 问题列表\n")
-        for issue in result.issues:
-            icon = {"error": "❌", "warning": "⚠️", "info": "ℹ️"}.get(issue.severity, "•")
-            # 行号：支持范围显示
-            if issue.end_line and issue.end_line != issue.start_line:
-                location = f"{issue.file_path}:{issue.start_line}-{issue.end_line}"
-            else:
-                location = f"{issue.file_path}:{issue.start_line}"
-            lines.append(f"{icon} **{location}**\n\n{issue.message}\n")
-            if issue.original_code:
-                lines.append(f"**问题代码：**\n\n{issue.original_code}\n")
-            if issue.suggested_code:
-                lines.append(f"**建议修改：**\n\n{issue.suggested_code}\n")
+    body = result.body.strip()
+    if body:
+        sections.append(body)
 
     # 没有匹配到提交人时，在末尾 @ maintainer
     if at and at.fallback_phones:
         at_text = " ".join(f"@{phone}" for phone in at.fallback_phones)
-        lines.append(f"\n> 请相关维护者关注 {at_text}\n")
+        sections.append(f"> 请相关维护者关注 {at_text}")
 
-    return "\n".join(lines)
+    return "\n\n".join(section for section in sections if section)
 
 
 def _sign_url(webhook_url: str, secret: str) -> str:
@@ -79,7 +84,7 @@ class DingtalkChannel(Channel):
             logger.warning("钉钉 Webhook URL 未配置，跳过发送")
             return False
 
-        logger.info("准备发送钉钉通知：issues=%d, summary=%d字符", len(result.issues), len(result.summary))
+        logger.info("准备发送钉钉通知：body=%d字符", len(result.body))
 
         url = self.config.dingtalk_webhook_url
         if self.config.dingtalk_webhook_secret:
@@ -101,14 +106,14 @@ class DingtalkChannel(Channel):
         else:
             logger.warning("AIR_CONTACTS 未配置，跳过 @mention")
 
-        content = _format_message(result, target, at_result)
+        content = _format_message(result, target, self.config.project_name, at_result)
         logger.debug("钉钉消息完整内容：\n%s", content)
 
         at_phones = at_result.all_phones if at_result else []
         payload: dict = {
             "msgtype": "markdown",
             "markdown": {
-                "title": "Code Review 结果",
+                "title": _extract_title(result.body),
                 "text": content
             },
             "at": {

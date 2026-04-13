@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 import logging
 import os
+from pathlib import Path
 import shutil
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,25 @@ def _mask(value: str, show: int = 4) -> str:
   if len(value) <= show * 2:
     return "***"
   return f"{value[:show]}***{value[-show:]}"
+
+
+def _resolve_project_name(work_dir: str | None) -> str:
+  """解析项目名称。
+
+  优先级：
+  1. AIR_PROJECT_NAME
+  2. CI_PROJECT_PATH
+  3. CI_PROJECT_NAME
+  4. 工作目录名
+  """
+  for key in ("AIR_PROJECT_NAME", "CI_PROJECT_PATH", "CI_PROJECT_NAME"):
+    if value := os.getenv(key, "").strip():
+      return value
+
+  if work_dir:
+    return Path(work_dir).resolve().name
+
+  return "未知项目"
 
 
 @dataclass
@@ -59,15 +79,19 @@ class AppConfig:
   # 联系人配置（JSON 字符串）
   contacts_json: str = field(
     default_factory=lambda: os.getenv("AIR_CONTACTS", ""))
+  project_name: str = field(default="")
 
   def __post_init__(self) -> None:
     # 命令行未传入时，回退到环境变量
     if self.work_dir is None:
       self.work_dir = os.getenv("AIR_WORK_DIR")
+    if not self.project_name:
+      self.project_name = _resolve_project_name(self.work_dir)
 
     logger.info(
-        "配置加载完成：work_dir=%s, max_commits=%d",
+        "配置加载完成：work_dir=%s, project_name=%s, max_commits=%d",
         self.work_dir or "(未设置)",
+        self.project_name,
         self.max_commits,
     )
     logger.info(

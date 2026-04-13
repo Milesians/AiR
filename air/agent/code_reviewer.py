@@ -16,14 +16,14 @@ def _parse_result_message(message: ResultMessage) -> ReviewResult:
     """解析 ResultMessage 为 ReviewResult"""
     if message.subtype == "error_max_structured_output_retries":
         logger.error("Claude 无法生成结构化结果（超过重试次数）")
-        return ReviewResult(summary="审查失败：无法生成结构化结果。")
+        return ReviewResult(body="审查失败：无法生成结构化结果。")
 
     if not message.structured_output:
         logger.warning("ResultMessage 无 structured_output")
-        return ReviewResult(summary="审查完成，但结果为空。")
+        return ReviewResult(body="审查完成，但结果为空。")
 
     result = ReviewResult.model_validate(message.structured_output)
-    logger.info("审查完成：发现 %d 个问题", len(result.issues))
+    logger.info("审查完成：正文 %d 字符", len(result.body))
     return result
 
 
@@ -83,7 +83,7 @@ class CodeReviewer:
                 result = _parse_result_message(message)
 
             if result is None:
-                return ReviewResult(summary="审查完成，但未收到结果。")
+                return ReviewResult(body="审查完成，但未收到结果。")
 
             return result
         except (ProcessError, MessageParseError) as e:

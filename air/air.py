@@ -18,7 +18,7 @@ async def main(target: ReviewTarget, config: AppConfig) -> None:
     reviewer = CodeReviewer(config)
     result = await reviewer.review(target)
 
-    logger.info("审查结束，开始推送结果：issues=%d", len(result.issues))
+    logger.info("审查结束，开始推送结果：body=%d字符", len(result.body))
     ok = DingtalkChannel(config).send(result, target)
     if ok:
         logger.info("结果推送完成")

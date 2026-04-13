@@ -80,7 +80,7 @@ commit 数量 ≤ 上限？
     └─ 否: Claude 审查 before..after 整体 diff
     │
     ▼
-结构化审查结果（JSON）
+结构化审查结果（`body` Markdown 正文）
     │
     ▼
 推送钉钉 Webhook
@@ -98,6 +98,7 @@ commit 数量 ≤ 上限？
 | `DINGTALK_WEBHOOK_URL` | ✅ | 钉钉机器人 Webhook |
 | `DINGTALK_WEBHOOK_SECRET` | — | 钉钉机器人加签密钥 |
 | `AIR_CONTACTS` | — | 联系人配置（JSON），用于钉钉 @mention，详见下方说明 |
+| `AIR_PROJECT_NAME` | — | 钉钉消息中展示的项目名称；未设置时优先使用 `CI_PROJECT_PATH` / `CI_PROJECT_NAME`，再回退到 `AIR_WORK_DIR` 目录名 |
 | `AIR_WORK_DIR` | — | 代码仓库路径，CI 中设为 `$CI_PROJECT_DIR`（命令行 `--work-dir` 优先） |
 | `AIR_MAX_COMMITS` | — | commit 数量上限，超过时降级为整体 diff 审查，默认 10 |
 | `CLAUDE_MAX_TURNS` | — | Claude 最大对话轮数，默认 10 |
@@ -125,7 +126,9 @@ air --debug                            # 开启 Debug 日志
 2. 安全设置选择「加签」，记录 Secret
 3. 将 Webhook 地址填入 `DINGTALK_WEBHOOK_URL`，Secret 填入 `DINGTALK_WEBHOOK_SECRET`
 
-审查结果将以 Markdown 格式发送，包含涉及的提交信息（提交哈希、提交人、提交时间）、总结和问题列表（按 error / warning / info 分级）。
+审查结果将以 Markdown 格式发送：
+- 程序固定补充项目名称、涉及的提交信息（提交哈希、提交人、提交时间）与 @mention
+- Agent 仅返回一个 `body` 字段，其值会直接作为钉钉正文透传，标题也会优先从正文首行提取，结构不再由程序写死
 
 ### 联系人 @mention 配置
 
