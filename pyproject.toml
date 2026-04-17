@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "AI Code Reviewer for CI/CD pipelines"
 requires-python = ">=3.13"
 dependencies = [
-    "claude-agent-sdk>=0.1.48",
+    "claude-agent-sdk>=0.1.61",
     "python-dotenv>=1.2.2",
     "requests>=2.32.5",
 ]
