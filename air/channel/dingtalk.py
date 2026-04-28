@@ -12,7 +12,6 @@ from air.config import AppConfig
 from air.data.contacts import AtResult, parse_contacts, resolve_at
 from air.data.review_result import ReviewResult
 from air.target import ReviewTarget
-from .base import Channel
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +72,7 @@ def _sign_url(webhook_url: str, secret: str) -> str:
     return f"{webhook_url}&{urlencode({'timestamp': timestamp, 'sign': sign})}"
 
 
-class DingtalkChannel(Channel):
+class DingtalkChannel:
     """钉钉 Webhook 推送渠道"""
 
     def __init__(self, config: AppConfig):

@@ -80,7 +80,7 @@ commit 数量 ≤ 上限？
     └─ 否: Claude 审查 before..after 整体 diff
     │
     ▼
-结构化审查结果（`body` Markdown 正文）
+结构化审查结果（`body` Markdown 正文；结构化输出缺失时降级使用 Agent 文本结果）
     │
     ▼
 推送钉钉 Webhook
@@ -266,9 +266,10 @@ pyright
 
 1. **触发条件**：向仓库推送 Git Tag 时触发（例如在分支上执行 `git tag v1.0.0 && git push origin v1.0.0`）
 2. **build-docker**：直接从源码构建 Docker 镜像（使用 uv 安装依赖），推送到 GitHub Container Registry（`ghcr.io`）
-3. **release**：基于该 Tag 自动发布 GitHub Release（自动生成发布说明）
+3. **release**：基于该 Tag 自动发布 GitHub Release（自动生成发布说明），并附带镜像离线包 `air-<tag>-linux-amd64.tar.gz` 与对应的 `.sha256` 校验文件
 
 镜像标签格式：`ghcr.io/milesians/air/air:<tag>`（例如 `ghcr.io/milesians/air/air:v1.0.0`）。
+离线镜像可通过 `docker load -i air-<tag>-linux-amd64.tar.gz` 导入。
 
 ### 依赖升级策略（Dependabot）
 

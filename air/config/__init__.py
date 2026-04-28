@@ -7,21 +7,6 @@ import shutil
 logger = logging.getLogger(__name__)
 
 
-# 处理环境变量
-if url := os.environ.get("OPENAI_BASE_URL"):
-  os.environ.setdefault("ANTHROPIC_BASE_URL", url)
-
-if key := os.environ.get("OPENAI_API_KEY"):
-  os.environ.setdefault("ANTHROPIC_AUTH_TOKEN", key)
-
-if model := os.environ.get("OPENAI_MODEL"):
-  os.environ.setdefault("ANTHROPIC_MODEL", model)
-  os.environ.setdefault("ANTHROPIC_REASONING_MODEL", model)
-  os.environ.setdefault("ANTHROPIC_DEFAULT_HAIKU_MODEL", model)
-  os.environ.setdefault("ANTHROPIC_DEFAULT_OPUS_MODEL", model)
-  os.environ.setdefault("ANTHROPIC_DEFAULT_SONNET_MODEL", model)
-
-
 def _mask(value: str, show: int = 4) -> str:
   """遮盖敏感值，显示前后若干字符"""
   if not value:
@@ -50,6 +35,30 @@ def _resolve_project_name(work_dir: str | None) -> str:
   return "未知项目"
 
 
+def _resolve_claude_cli_path() -> str:
+  """解析 Claude CLI 路径：环境变量 > PATH 查找 > 默认路径"""
+  if path := os.getenv("CLAUDE_CLI_PATH"):
+    return path
+  return shutil.which("claude") or "/usr/local/bin/claude"
+
+
+def _bootstrap_anthropic_env() -> None:
+  """将 OPENAI_* 环境变量映射为 Claude SDK 需要的 ANTHROPIC_*。
+
+  仅在未显式设置 ANTHROPIC_* 时填充，原值始终优先。
+  """
+  if url := os.environ.get("OPENAI_BASE_URL"):
+    os.environ.setdefault("ANTHROPIC_BASE_URL", url)
+  if key := os.environ.get("OPENAI_API_KEY"):
+    os.environ.setdefault("ANTHROPIC_AUTH_TOKEN", key)
+  if model := os.environ.get("OPENAI_MODEL"):
+    os.environ.setdefault("ANTHROPIC_MODEL", model)
+    os.environ.setdefault("ANTHROPIC_REASONING_MODEL", model)
+    os.environ.setdefault("ANTHROPIC_DEFAULT_HAIKU_MODEL", model)
+    os.environ.setdefault("ANTHROPIC_DEFAULT_OPUS_MODEL", model)
+    os.environ.setdefault("ANTHROPIC_DEFAULT_SONNET_MODEL", model)
+
+
 @dataclass
 class AppConfig:
   """统一应用配置，从环境变量加载"""
@@ -61,12 +70,8 @@ class AppConfig:
   max_commits: int = field(
     default_factory=lambda: int(os.getenv("AIR_MAX_COMMITS", "10")))
 
-  # Claude CLI 路径：环境变量 > PATH 查找 > 默认路径
-  claude_cli_path: str | None = field(
-    default_factory=lambda: os.getenv(
-      "CLAUDE_CLI_PATH",
-      shutil.which("claude") or "/usr/local/bin/claude",
-    ))
+  # Claude CLI 路径，None 时在 __post_init__ 中按 env > which > 默认路径解析
+  claude_cli_path: str | None = field(default=None)
   claude_max_turns: int = field(
     default_factory=lambda: int(os.getenv("CLAUDE_MAX_TURNS", "30")))
 
@@ -82,11 +87,16 @@ class AppConfig:
   project_name: str = field(default="")
 
   def __post_init__(self) -> None:
+    # 在读取/使用任何 ANTHROPIC_* 前完成兼容映射
+    _bootstrap_anthropic_env()
+
     # 命令行未传入时，回退到环境变量
     if self.work_dir is None:
       self.work_dir = os.getenv("AIR_WORK_DIR")
     if not self.project_name:
       self.project_name = _resolve_project_name(self.work_dir)
+    if not self.claude_cli_path:
+      self.claude_cli_path = _resolve_claude_cli_path()
 
     logger.info(
         "配置加载完成：work_dir=%s, project_name=%s, max_commits=%d",

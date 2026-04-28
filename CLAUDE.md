@@ -36,9 +36,9 @@ docker compose build && docker compose run --rm air air --commit HEAD --debug
 
 ## 项目架构
 
-整体流程由 `air/air.py:main()` 编排：
+整体流程由 `air/__main__.py:run()` 编排：
 
-1. `__main__.py` 解析命令行参数，构建 `ReviewTarget` 和 `AppConfig`，传入 `main()`
+1. `__main__.py:main()` 解析命令行参数，构建 `ReviewTarget` 和 `AppConfig`，再交给异步 `run()`
    - `--commit SHA`：手动指定单个 commit
    - 无参数：CI 模式，从 `CI_COMMIT_BEFORE_SHA..CI_COMMIT_SHA` 自动检测 commit 范围
 2. `ReviewTarget` 包含 commit 列表，根据数量选择审查策略：
@@ -51,18 +51,26 @@ docker compose build && docker compose run --rm air air --commit HEAD --debug
 
 | 模块 | 职责 |
 |------|------|
-| `air/target.py` | `CommitInfo` dataclass（sha、short_sha、author、email、date、subject）；`ReviewTarget` dataclass，含 `commits` 列表、`before_sha`、`after_sha`、`commit_infos`；工厂方法 `from_gitlab_ci()` 从 CI 环境变量构建、`from_commit(sha)` 从单个 commit 构建 |
-| `air/config/__init__.py` | `AppConfig` dataclass；从环境变量加载配置，`OPENAI_*` 自动映射为 `ANTHROPIC_*` |
+| `air/__main__.py` | CLI 入口：参数解析、日志初始化、`run()` 编排（替代旧 `air/air.py`） |
+| `air/target.py` | `CommitInfo` dataclass（sha、short_sha、author、email、date、subject）；`ReviewTarget` dataclass，含 `commits` 列表、`before_sha`、`after_sha`、`commit_infos`；工厂方法 `from_ci_env()` 从 CI 环境变量构建、`from_commit(sha)` 从单个 commit 构建 |
+| `air/config/__init__.py` | `AppConfig` dataclass；在 `__post_init__` 中按 `OPENAI_* → ANTHROPIC_*` 兼容映射环境变量，并解析 Claude CLI 路径与项目名称 |
 | `air/agent/code_reviewer.py` | `CodeReviewer` — 调用 `claude_agent_sdk.query()`，统一 `review(target)` 方法，根据 commit 数量选择 prompt 模板 |
-| `air/data/review_result.py` | Pydantic 模型：`ReviewResult`（仅含 `body` 字段，承载 Agent 生成的 Markdown 正文，并拒绝旧版结构字段） |
+| `air/data/review_result.py` | Pydantic 模型：`ReviewResult`（承载 Agent 生成的 Markdown 正文，未来用于扩展提交人、提交来源等元信息） |
 | `air/prompts/` | Prompt 模板目录，`load_prompt(name)` 加载 `.md` 模板文件；包含 `review_commits.md` 和 `review_diff.md` |
-| `air/channel/base.py` | `Channel` 抽象基类，`send(result) -> bool` |
-| `air/data/contacts.py` | `Contact` dataclass（email、phone、regex、role）；`parse_contacts()` 从 JSON 解析联系人；`resolve_at_phones()` 根据 commit 信息匹配联系人手机号 |
+| `air/data/contacts.py` | `Contact` dataclass（email、phone、regex、role）；`parse_contacts()` 从 JSON 解析联系人；`resolve_at()` 根据 commit 信息匹配联系人手机号 |
 | `air/channel/dingtalk.py` | `DingtalkChannel` — 仅补充项目名称、提交信息和 @mention；正文直接透传，标题默认从 Agent 正文首行提取，再发送到钉钉 Webhook，支持加签 |
 
 ### 扩展指引
 
-- **新增推送渠道**：在 `air/channel/` 中继承 `Channel` 抽象类
+- **新增推送渠道**：在 `air/channel/` 中实现一个 `send(result, target) -> bool` 方法的类，并在 `__main__.py:run()` 中接入。当前只有钉钉一个渠道，如有多渠道需求再抽象 `Channel` 协议或基类。
+
+### 安全权限说明
+
+`CodeReviewer` 使用 `permission_mode="bypassPermissions"` 与 `allowed_tools=["*"]`，原因：
+- AiR 仅运行在 CI 容器或本地受控环境，对仓库已经有完整 checkout 权限，Agent 拿不到额外能力。
+- Code Review 需要 git/grep/读文件等几乎全集工具，逐项白名单维护成本远大于收益。
+- Agent 的工作目录被 `cwd=work_dir` 限定，且不会触达外部网络以外的关键资源。
+若未来引入写操作或在生产宿主机直接执行，需要重新评估这一权限。
 
 ## 环境变量
 
@@ -87,10 +95,10 @@ docker compose build && docker compose run --rm air air --commit HEAD --debug
 ## 技术要点
 
 - 整体异步架构（`async/await`），入口通过 `asyncio.run()` 驱动
-- Claude 集成使用 `claude_agent_sdk.query()` + Pydantic JSON Schema 结构化输出
+- Claude 集成使用 `claude_agent_sdk.query()` + Pydantic JSON Schema 结构化输出；若 SDK 返回最终 `ResultMessage` 但缺少 `structured_output`，降级使用 `result` 文本，避免尾部 reader 错误覆盖已收到的结果
 - 统一使用 git 命令获取 diff 和上下文，不依赖外部 API
 - 构建后端为 `hatchling`，CLI 入口点定义在 `pyproject.toml` 的 `[project.scripts]`
-- CI/CD 通过 GitHub Actions（`.github/workflows/release.yml`）：在推送 Git Tag 时触发，按 Tag 名构建并推送 Docker 镜像到 GHCR，同时自动发布对应 GitHub Release（无需 PyInstaller 编译步骤）
+- CI/CD 通过 GitHub Actions（`.github/workflows/release.yml`）：在推送 Git Tag 时触发，按 Tag 名构建并推送 Docker 镜像到 GHCR，同时自动发布对应 GitHub Release，并附带可离线导入的镜像压缩包（`air-<tag>-linux-amd64.tar.gz`）和 SHA256 校验文件
 - Dependabot 使用 `groups` 将 `uv` 依赖按周聚合到单个 PR（配置见 `.github/dependabot.yml`）
 - Docker 镜像基于 `node:24-slim`（因为需要 Claude Code CLI），包含 Java 25 + jdtls 支持；开发与生产共用同一个 `docker/Dockerfile`
 

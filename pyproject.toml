@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.scripts]
-air = "air.__main__:main_sync"
+air = "air.__main__:main"
 
 [build-system]
 requires = ["hatchling"]

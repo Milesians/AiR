@@ -31,19 +31,17 @@ class ReviewTarget:
     @staticmethod
     def from_commit(sha: str, work_dir: str | None = None) -> "ReviewTarget":
         """从单个 commit 构建审查目标"""
-        _git_safe_directory(work_dir)
         logger.info("从单个 commit 构建审查目标：%s", sha)
         infos = _git_commit_infos([sha], work_dir)
         return ReviewTarget(commits=[sha], after_sha=sha, commit_infos=infos)
 
     @staticmethod
-    def from_gitlab_ci(work_dir: str | None = None) -> "ReviewTarget":
-        """从 GitLab CI 环境变量构建审查目标
+    def from_ci_env(work_dir: str | None = None) -> "ReviewTarget":
+        """从 CI 环境变量构建审查目标
 
         使用 CI_COMMIT_BEFORE_SHA 和 CI_COMMIT_SHA 确定 push 范围，
         通过 git log 获取 commit 列表。
         """
-        _git_safe_directory(work_dir)
         after_sha = os.getenv("CI_COMMIT_SHA", "")
         before_sha = os.getenv("CI_COMMIT_BEFORE_SHA", "")
 
@@ -70,25 +68,18 @@ class ReviewTarget:
         return ReviewTarget(commits=commits, before_sha=before_sha, after_sha=after_sha, commit_infos=infos)
 
 
-def _git_safe_directory(work_dir: str | None = None) -> None:
-    """将工作目录加入 git safe.directory，解决 CI 环境中目录所有者不一致的问题"""
-    target_dir = work_dir or os.getcwd()
-    cmd = ["git", "config", "--global", "--add", "safe.directory", target_dir]
-    try:
-        subprocess.run(cmd, capture_output=True, text=True, check=True)
-        logger.debug("已将 %s 加入 git safe.directory", target_dir)
-    except subprocess.CalledProcessError as e:
-        logger.warning("设置 safe.directory 失败：%s", e.stderr.strip())
+def _git(*args: str, work_dir: str | None = None) -> subprocess.CompletedProcess[str]:
+    """运行一条 git 命令；通过 -c safe.directory=* 绕过 CI 中的所有者校验，避免污染全局 git config"""
+    cmd = ["git", "-c", "safe.directory=*", *args]
+    logger.debug("执行命令：%s", " ".join(cmd))
+    return subprocess.run(cmd, capture_output=True, text=True, cwd=work_dir, check=True)
 
 
 def _git_log_range(before_sha: str, after_sha: str, work_dir: str | None = None) -> list[str]:
     """通过 git log 获取两个 SHA 之间的 commit 列表（从旧到新）"""
-    cmd = ["git", "log", "--format=%H", "--reverse", f"{before_sha}..{after_sha}"]
-    logger.debug("执行命令：%s", " ".join(cmd))
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=work_dir, check=True)
-        commits = [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
-        return commits
+        result = _git("log", "--format=%H", "--reverse", f"{before_sha}..{after_sha}", work_dir=work_dir)
+        return [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
     except subprocess.CalledProcessError as e:
         logger.error("git log 失败：%s", e.stderr.strip())
         return []
@@ -101,10 +92,8 @@ def _git_commit_infos(shas: list[str], work_dir: str | None = None) -> list[Comm
     # 分隔符不能包含 % 后跟字母，否则会被 git format 解析
     sep = "<|>"
     fmt = sep.join(["%H", "%h", "%an", "%ae", "%ai", "%s"])
-    cmd = ["git", "log", f"--format={fmt}", "--no-walk", *shas]
-    logger.debug("执行命令：%s", " ".join(cmd))
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, cwd=work_dir, check=True)
+        result = _git("log", f"--format={fmt}", "--no-walk", *shas, work_dir=work_dir)
         infos = []
         for line in result.stdout.strip().splitlines():
             line = line.strip()

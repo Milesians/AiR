@@ -18,11 +18,19 @@ def _parse_result_message(message: ResultMessage) -> ReviewResult:
         logger.error("Claude 无法生成结构化结果（超过重试次数）")
         return ReviewResult(body="审查失败：无法生成结构化结果。")
 
-    if not message.structured_output:
+    if message.structured_output:
+        result = ReviewResult.model_validate(message.structured_output)
+    elif message.result:
+        logger.warning("ResultMessage 无 structured_output，使用 result 文本")
+        result = ReviewResult(body=message.result)
+    elif message.is_error:
+        details = "；".join(message.errors or []) or message.stop_reason or message.subtype
+        logger.error("Claude 返回错误结果：%s", details)
+        result = ReviewResult(body=f"审查失败：{details}")
+    else:
         logger.warning("ResultMessage 无 structured_output")
-        return ReviewResult(body="审查完成，但结果为空。")
+        result = ReviewResult(body="审查完成，但结果为空。")
 
-    result = ReviewResult.model_validate(message.structured_output)
     logger.info("审查完成：正文 %d 字符", len(result.body))
     return result
 
@@ -64,14 +72,14 @@ class CodeReviewer:
         try:
             async for message in query(prompt=prompt,
                                        options=self._build_options()):
-                logger.info("收到[%s]消息：\n %s", type(message).__name__,
-                            message)
+                logger.debug("收到[%s]消息：\n %s", type(message).__name__,
+                             message)
 
                 if not isinstance(message, ResultMessage):
                     continue
 
                 usage = message.usage or {}
-                logger.info("Usage 原始数据：%s", usage)
+                logger.debug("Usage 原始数据：%s", usage)
                 logger.info(
                     "审查统计：cost=$%.4f, turns=%d, duration=%dms (api=%dms)",
                     message.total_cost_usd or 0,
@@ -81,6 +89,7 @@ class CodeReviewer:
                 )
 
                 result = _parse_result_message(message)
+                break
 
             if result is None:
                 return ReviewResult(body="审查完成，但未收到结果。")
@@ -90,9 +99,11 @@ class CodeReviewer:
             logger.error("Claude 调用失败：%s", e)
             raise
         except Exception as e:
+            if result is not None:
+                logger.warning("Claude 结束时发生异常，返回已收到的审查结果：%s", e)
+                return result
             logger.error("审查异常：%s - %s", type(e).__name__, e, exc_info=True)
             raise
-
 
     def _build_options(self) -> ClaudeAgentOptions:
         """构建 Claude Agent 配置"""

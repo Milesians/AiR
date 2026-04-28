@@ -2,9 +2,16 @@ import argparse
 import asyncio
 import logging
 
-from air.air import main
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from air.agent import CodeReviewer
+from air.channel import DingtalkChannel
 from air.config import AppConfig
 from air.target import ReviewTarget
+
+logger = logging.getLogger(__name__)
 
 
 def setup_logging(debug: bool) -> None:
@@ -48,7 +55,22 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main_sync() -> None:
+async def run(target: ReviewTarget, config: AppConfig) -> None:
+    """主流程：审查 → 推送"""
+    logger.info("AiR 启动：%d 个 commit, after_sha=%s", len(target.commits), target.after_sha)
+
+    reviewer = CodeReviewer(config)
+    result = await reviewer.review(target)
+
+    logger.info("审查结束，开始推送结果：body=%d字符", len(result.body))
+    ok = DingtalkChannel(config).send(result, target)
+    if ok:
+        logger.info("结果推送完成")
+    else:
+        logger.warning("结果推送失败或未配置推送渠道")
+
+
+def main() -> None:
     args = parse_args()
     setup_logging(args.debug)
 
@@ -57,10 +79,10 @@ def main_sync() -> None:
     if args.commit:
         target = ReviewTarget.from_commit(args.commit, work_dir=config.work_dir)
     else:
-        target = ReviewTarget.from_gitlab_ci(work_dir=config.work_dir)
+        target = ReviewTarget.from_ci_env(work_dir=config.work_dir)
 
-    asyncio.run(main(target, config))
+    asyncio.run(run(target, config))
 
 
 if __name__ == "__main__":
-    main_sync()
+    main()
