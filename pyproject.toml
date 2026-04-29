@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.scripts]
-air = "air.__main__:main"
+air = "air.flows.code_review.cli:main"
 
 [build-system]
 requires = ["hatchling"]

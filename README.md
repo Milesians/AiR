@@ -88,6 +88,17 @@ commit 数量 ≤ 上限？
 
 ---
 
+## 项目结构
+
+AiR 目前只保留 CI code review 流程：
+
+```text
+air/flows/code_review/      # air 命令：commit / diff code review
+air/shared/                 # 公共配置与 prompt 加载器
+```
+
+---
+
 ## 环境变量完整参考
 
 | 变量名 | 必填 | 说明 |
@@ -117,8 +128,6 @@ air --commit <SHA>                     # 审查指定的单个 commit
 air --commit <SHA> --work-dir /path    # 指定工作目录
 air --debug                            # 开启 Debug 日志
 ```
-
----
 
 ## 钉钉机器人配置
 

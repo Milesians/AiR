@@ -1,9 +1,9 @@
 import logging
 
-from air.config import AppConfig
-from air.data import ReviewResult
-from air.prompts import load_prompt
-from air.target import ReviewTarget
+from air.shared.config import AppConfig
+from air.flows.code_review.result import ReviewResult
+from air.shared.prompts import load_prompt
+from air.flows.code_review.target import ReviewTarget
 from claude_agent_sdk import query, ClaudeAgentOptions, ResultMessage, \
     ThinkingConfigDisabled
 from claude_agent_sdk._errors import ProcessError, MessageParseError

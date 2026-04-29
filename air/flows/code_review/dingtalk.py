@@ -8,10 +8,10 @@ from urllib.parse import urlencode
 
 import requests
 
-from air.config import AppConfig
-from air.data.contacts import AtResult, parse_contacts, resolve_at
-from air.data.review_result import ReviewResult
-from air.target import ReviewTarget
+from air.shared.config import AppConfig
+from air.flows.code_review.contacts import AtResult, parse_contacts, resolve_at
+from air.flows.code_review.result import ReviewResult
+from air.flows.code_review.target import ReviewTarget
 
 logger = logging.getLogger(__name__)
 

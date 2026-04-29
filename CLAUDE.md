@@ -36,33 +36,38 @@ docker compose build && docker compose run --rm air air --commit HEAD --debug
 
 ## 项目架构
 
-整体流程由 `air/__main__.py:run()` 编排：
+项目只保留 CI Code Review 流程：CLI、目标模型、Agent、结果模型、Prompt 和该流程专属输出放在 `air/flows/code_review/`；公共配置和 prompt 加载器放在 `air/shared/`。
 
-1. `__main__.py:main()` 解析命令行参数，构建 `ReviewTarget` 和 `AppConfig`，再交给异步 `run()`
+### Code Review 流程
+
+入口为 `air.flows.code_review.cli:main`：
+
+1. `cli.py:main()` 解析命令行参数，构建 `ReviewTarget` 和 `AppConfig`
    - `--commit SHA`：手动指定单个 commit
    - 无参数：CI 模式，从 `CI_COMMIT_BEFORE_SHA..CI_COMMIT_SHA` 自动检测 commit 范围
 2. `ReviewTarget` 包含 commit 列表，根据数量选择审查策略：
    - 正常（≤ max_commits）：传 commit 列表给 Claude，Claude 自行 git 逐个查看
    - 降级（> max_commits）：传整体 diff 范围（before_sha..after_sha）
-3. `CodeReviewer.review(target)` 统一入口，调用 Claude 审查
+3. `CodeReviewer.review(target)` 调用 Claude 审查
 4. 审查结果经 `DingtalkChannel.send()` 推送到钉钉
 
 ### 关键模块
 
 | 模块 | 职责 |
 |------|------|
-| `air/__main__.py` | CLI 入口：参数解析、日志初始化、`run()` 编排（替代旧 `air/air.py`） |
-| `air/target.py` | `CommitInfo` dataclass（sha、short_sha、author、email、date、subject）；`ReviewTarget` dataclass，含 `commits` 列表、`before_sha`、`after_sha`、`commit_infos`；工厂方法 `from_ci_env()` 从 CI 环境变量构建、`from_commit(sha)` 从单个 commit 构建 |
-| `air/config/__init__.py` | `AppConfig` dataclass；在 `__post_init__` 中按 `OPENAI_* → ANTHROPIC_*` 兼容映射环境变量，并解析 Claude CLI 路径与项目名称 |
-| `air/agent/code_reviewer.py` | `CodeReviewer` — 调用 `claude_agent_sdk.query()`，统一 `review(target)` 方法，根据 commit 数量选择 prompt 模板 |
-| `air/data/review_result.py` | Pydantic 模型：`ReviewResult`（承载 Agent 生成的 Markdown 正文，未来用于扩展提交人、提交来源等元信息） |
-| `air/prompts/` | Prompt 模板目录，`load_prompt(name)` 加载 `.md` 模板文件；包含 `review_commits.md` 和 `review_diff.md` |
-| `air/data/contacts.py` | `Contact` dataclass（email、phone、regex、role）；`parse_contacts()` 从 JSON 解析联系人；`resolve_at()` 根据 commit 信息匹配联系人手机号 |
-| `air/channel/dingtalk.py` | `DingtalkChannel` — 仅补充项目名称、提交信息和 @mention；正文直接透传，标题默认从 Agent 正文首行提取，再发送到钉钉 Webhook，支持加签 |
+| `air/flows/code_review/cli.py` | `air` 命令入口，解析参数并编排代码审查 |
+| `air/flows/code_review/target.py` | `CommitInfo`、`ReviewTarget` 及 Git commit 范围解析 |
+| `air/flows/code_review/reviewer.py` | `CodeReviewer`，根据 commit 数量选择审查 prompt 并调用 Claude |
+| `air/flows/code_review/result.py` | `ReviewResult`，承载 code review Markdown 正文 |
+| `air/flows/code_review/dingtalk.py` | `DingtalkChannel`，补充项目、提交信息和 @mention 后发送钉钉 |
+| `air/flows/code_review/contacts.py` | 联系人解析和提交人 @mention 匹配 |
+| `air/flows/code_review/prompts/` | code review prompt 模板 |
+| `air/shared/config.py` | `AppConfig`，统一加载环境变量、Claude CLI 路径和项目名称 |
+| `air/shared/prompts.py` | `load_prompt(name)`，从 code review `prompts/` 目录加载模板 |
 
 ### 扩展指引
 
-- **新增推送渠道**：在 `air/channel/` 中实现一个 `send(result, target) -> bool` 方法的类，并在 `__main__.py:run()` 中接入。当前只有钉钉一个渠道，如有多渠道需求再抽象 `Channel` 协议或基类。
+- **新增 code review 推送渠道**：优先放在 `air/flows/code_review/`；只有多个流程共享时再提升到 `air/shared/`。
 
 ### 安全权限说明
 

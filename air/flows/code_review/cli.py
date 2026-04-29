@@ -6,10 +6,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from air.agent import CodeReviewer
-from air.channel import DingtalkChannel
-from air.config import AppConfig
-from air.target import ReviewTarget
+from air.flows.code_review.reviewer import CodeReviewer
+from air.flows.code_review.dingtalk import DingtalkChannel
+from air.shared.config import AppConfig
+from air.flows.code_review.target import ReviewTarget
 
 logger = logging.getLogger(__name__)
 
