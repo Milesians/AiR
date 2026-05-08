@@ -118,7 +118,7 @@ docker compose build && docker compose run --rm air sh -lc 'air --commit "${COMM
 - 统一使用 git 命令获取 diff 和仓库上下文；可选 Jira 工单上下文仅通过 MCP 只读获取
 - Jira 工单上下文通过 Claude Agent 的 `mcp_servers` 运行时注入；只有 Jira 环境变量完整时启用，默认 `READ_ONLY_MODE=true`
 - 构建后端为 `hatchling`，CLI 入口点定义在 `pyproject.toml` 的 `[project.scripts]`
-- CI/CD 通过 GitHub Actions（`.github/workflows/release.yml`）：在推送 Git Tag 时触发，按 Tag 名构建并推送 Docker 镜像到 GHCR，同时自动发布对应 GitHub Release，并附带可离线导入的镜像压缩包（`air-<tag>-linux-amd64.tar.gz`）和 SHA256 校验文件
+- CI/CD 通过 GitHub Actions（`.github/workflows/release.yml`）：在推送 Git Tag 时触发，构建并推送 `<tag>` 与 `latest` 两个 GHCR 镜像标签，同时自动发布 GitHub Release；Release 说明关联 GHCR Package，不上传镜像 tar 包
 - Dependabot 使用 `groups` 将 `uv` 依赖按周聚合到单个 PR（配置见 `.github/dependabot.yml`）
 - Docker 镜像基于 `node:24-slim`（因为需要 Claude Code CLI），包含 Java 25 + jdtls 支持；开发与生产共用同一个 `docker/Dockerfile`
 

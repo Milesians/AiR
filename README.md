@@ -31,7 +31,7 @@
 ```yaml
 ai-code-review:
   stage: review
-  image: ghcr.io/milesians/air/air:latest-snapshot
+  image: ghcr.io/milesians/air/air:latest
   variables:
     AIR_WORK_DIR: $CI_PROJECT_DIR
   script:
@@ -46,7 +46,7 @@ ai-code-review:
 ```yaml
 ai-code-review:
   stage: review
-  image: ghcr.io/milesians/air/air:latest-snapshot
+  image: ghcr.io/milesians/air/air:latest
   variables:
     AIR_WORK_DIR: $CI_PROJECT_DIR
   script:
@@ -309,10 +309,11 @@ pyright
 
 1. **触发条件**：向仓库推送 Git Tag 时触发（例如在分支上执行 `git tag v1.0.0 && git push origin v1.0.0`）
 2. **build-docker**：直接从源码构建 Docker 镜像（使用 uv 安装依赖），推送到 GitHub Container Registry（`ghcr.io`）
-3. **release**：基于该 Tag 自动发布 GitHub Release（自动生成发布说明），并附带镜像离线包 `air-<tag>-linux-amd64.tar.gz` 与对应的 `.sha256` 校验文件
+3. **release**：基于该 Tag 自动发布 GitHub Release，发布说明中关联对应 GHCR Package 和镜像拉取命令，不再上传 Docker 镜像 tar 包
 
-镜像标签格式：`ghcr.io/milesians/air/air:<tag>`（例如 `ghcr.io/milesians/air/air:v1.0.0`）。
-离线镜像可通过 `docker load -i air-<tag>-linux-amd64.tar.gz` 导入。
+镜像标签格式：
+- 版本镜像：`ghcr.io/milesians/air/air:<tag>`（例如 `ghcr.io/milesians/air/air:v1.0.0`）
+- 最新镜像：`ghcr.io/milesians/air/air:latest`
 
 ### 依赖升级策略（Dependabot）
 
