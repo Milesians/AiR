@@ -130,8 +130,8 @@ class CodeReviewer:
                     message.duration_api_ms,
                 )
 
-                result = _parse_result_message(message)
-                break
+                if result is None:
+                    result = _parse_result_message(message)
 
             if result is None:
                 return ReviewResult(body="审查完成，但未收到结果。")

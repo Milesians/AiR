@@ -43,10 +43,13 @@ class ParseResultMessageTest(unittest.TestCase):
 
 
 class CodeReviewerQueryTest(unittest.IsolatedAsyncioTestCase):
-    async def test_stops_after_result_message(self) -> None:
+    async def test_drains_messages_after_result_message(self) -> None:
+        drained = False
+
         async def fake_query(*, prompt, options):
+            nonlocal drained
             yield _result_message(structured_output={"body": "LGTM"})
-            raise AssertionError("ResultMessage 后不应继续读取")
+            drained = True
 
         reviewer = CodeReviewer(AppConfig())
 
@@ -57,6 +60,7 @@ class CodeReviewerQueryTest(unittest.IsolatedAsyncioTestCase):
             result = await reviewer._query("prompt")
 
         self.assertEqual(result.body, "LGTM")
+        self.assertTrue(drained)
 
     async def test_adds_jira_instruction_to_prompt_when_enabled(self) -> None:
         captured: dict[str, str] = {}
