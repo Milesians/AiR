@@ -52,5 +52,10 @@ COPY --chown=air:air prese[t]/ /home/air/.claude/
 COPY --chown=air:air pyproject.toml uv.lock /home/air/app/
 COPY --chown=air:air air/ /home/air/app/air/
 RUN uv sync
+RUN uv tool install mcp-atlassian
 
-ENV PATH="/home/air/app/.venv/bin:${PATH}"
+USER root
+RUN ln -sf /home/air/app/.venv/bin/air /usr/local/bin/air
+
+USER air
+ENV PATH="/home/air/app/.venv/bin:/home/air/.local/bin:${PATH}"

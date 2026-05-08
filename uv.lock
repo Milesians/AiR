@@ -8,13 +8,15 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "claude-agent-sdk" },
+    { name = "opentelemetry-api" },
     { name = "python-dotenv" },
     { name = "requests" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "claude-agent-sdk", specifier = ">=0.1.61" },
+    { name = "claude-agent-sdk", specifier = ">=0.1.77" },
+    { name = "opentelemetry-api", specifier = ">=1.41.1" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "requests", specifier = ">=2.32.5" },
 ]
@@ -162,19 +164,20 @@ wheels = [
 
 [[package]]
 name = "claude-agent-sdk"
-version = "0.1.61"
+version = "0.1.77"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
     { name = "mcp" },
+    { name = "sniffio" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/15/31/e98b9e1d20e4e6e7c8e52cd9b30b63c8686a9781e9db0d941dc7801453b9/claude_agent_sdk-0.1.61.tar.gz", hash = "sha256:2dd6bcc8ed5a13b1a70dc986a01519537e9e690636bb278b942ede955fa9a09a", size = 127793, upload-time = "2026-04-16T22:02:09.092Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/60/d4/7e3ca29d1b6f76639b4bd4becb796ef68a492be3a561c6cd19abe5fe903a/claude_agent_sdk-0.1.77.tar.gz", hash = "sha256:cb292268ecab294047f02365298ecbf8cc17146c4c86fda54b068a1d38e1ebbb", size = 250297, upload-time = "2026-05-08T00:03:03.199Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c6/5f/8236b03d31c6151c164f9090e5ba68f189a56ec8a9a482ea8c0e0600c303/claude_agent_sdk-0.1.61-py3-none-macosx_11_0_arm64.whl", hash = "sha256:22d091e0b9b310125e2c6fcd454075f0f71c987db86b79153df91bdb412b9793", size = 60131827, upload-time = "2026-04-16T22:02:12.772Z" },
-    { url = "https://files.pythonhosted.org/packages/5e/b3/a86c5ed60000fddfc6d081861480c15399658479f484e05d610f55a3fe3d/claude_agent_sdk-0.1.61-py3-none-macosx_11_0_x86_64.whl", hash = "sha256:7d0d9020b8143a26460180a4d36609cb70c26f821f2dd20d246c4449de44bdad", size = 61951661, upload-time = "2026-04-16T22:02:17.275Z" },
-    { url = "https://files.pythonhosted.org/packages/5b/9f/44a35c80237dd1a6bd8a80e74c4fbb60ba6e36b1eb079f9ce1dd1f3e45a1/claude_agent_sdk-0.1.61-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:c63362ed0acb95b89d522d3a377e030b32d1169989f3e45fce85f40ed8f21da1", size = 73384844, upload-time = "2026-04-16T22:02:22.428Z" },
-    { url = "https://files.pythonhosted.org/packages/c3/5b/0822bcacb9fc02ecd1349bb4f81aa6c9c2f0588aafd10ef6ab419a5dc836/claude_agent_sdk-0.1.61-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:255e698bf6f78f1ed6790b2dbfa3b56870a9efbef1bb4ca6b118418eed7b715c", size = 73526187, upload-time = "2026-04-16T22:02:27.451Z" },
-    { url = "https://files.pythonhosted.org/packages/2e/77/999255728564ab8d872dca9ddd05dccef5186a8f2596421981b34e5c8094/claude_agent_sdk-0.1.61-py3-none-win_amd64.whl", hash = "sha256:bd3cc54476baabc050012b1a4577d9f59a0ab2545bb4dea64c61baa0e7dfb0c3", size = 75667458, upload-time = "2026-04-16T22:02:33.11Z" },
+    { url = "https://files.pythonhosted.org/packages/80/fc/dbb90aff01fe7bdd7708077aaff4b36d5be48a38318fd4ca2216aa64ed87/claude_agent_sdk-0.1.77-py3-none-macosx_11_0_arm64.whl", hash = "sha256:a5697c838cb3a0c78f73698933cd2eea98e8baea99be0740e314fc9e1f69fd4c", size = 60659903, upload-time = "2026-05-08T00:03:06.461Z" },
+    { url = "https://files.pythonhosted.org/packages/37/6e/c984d60f4b3cbbf7d84157283338493d11a2b557a2f6389118b5a7f8adc2/claude_agent_sdk-0.1.77-py3-none-macosx_11_0_x86_64.whl", hash = "sha256:a85e3a8cf5d521116d964d28939f25e367d18e5bdb2232cae260b8e8bd9d946f", size = 62721493, upload-time = "2026-05-08T00:03:09.808Z" },
+    { url = "https://files.pythonhosted.org/packages/00/83/575e798ce53b58e14d775db104cdb2558706e7f8d22dc647752208fa853f/claude_agent_sdk-0.1.77-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:16864b91bf369e99590e3ffba82e2d711807caaa4329b11462212779224cd355", size = 70393564, upload-time = "2026-05-08T00:03:13.383Z" },
+    { url = "https://files.pythonhosted.org/packages/00/67/50aed27534a9183e204cca33fbef36d0fe5f5145ebf4061c01f2edeaf6db/claude_agent_sdk-0.1.77-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:7db011c9c8ca4168249f1ce90d4372e13ebab2b122498167e6fb2a5c9c1bd427", size = 70582992, upload-time = "2026-05-08T00:03:16.997Z" },
+    { url = "https://files.pythonhosted.org/packages/83/3f/a9d396c46e40d025d4209cf0f6f01a62c70c33b70efceb2d2e991e8ed08c/claude_agent_sdk-0.1.77-py3-none-win_amd64.whl", hash = "sha256:fe7dd006a15a85c1d9a2698d6fffd58e0ce689db1f0040f5b5e4c06d51ce2505", size = 71224295, upload-time = "2026-05-08T00:03:20.695Z" },
 ]
 
 [[package]]
@@ -307,6 +310,18 @@ wheels = [
 ]
 
 [[package]]
+name = "importlib-metadata"
+version = "8.7.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "zipp" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f3/49/3b30cad09e7771a4982d9975a8cbf64f00d4a1ececb53297f1d9a7be1b10/importlib_metadata-8.7.1.tar.gz", hash = "sha256:49fef1ae6440c182052f407c8d34a68f72efc36db9ca90dc0113398f2fdde8bb", size = 57107, upload-time = "2025-12-21T10:00:19.278Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fa/5e/f8e9a1d23b9c20a551a8a02ea3637b4642e22c2626e3a13a9a29cdea99eb/importlib_metadata-8.7.1-py3-none-any.whl", hash = "sha256:5a1f80bf1daa489495071efbb095d75a634cf28a8bc299581244063b53176151", size = 27865, upload-time = "2025-12-21T10:00:18.329Z" },
+]
+
+[[package]]
 name = "jsonschema"
 version = "4.26.0"
 source = { registry = "https://pypi.org/simple" }
@@ -356,6 +371,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/fc/6d/62e76bbb8144d6ed86e202b5edd8a4cb631e7c8130f3f4893c3f90262b10/mcp-1.26.0.tar.gz", hash = "sha256:db6e2ef491eecc1a0d93711a76f28dec2e05999f93afd48795da1c1137142c66", size = 608005, upload-time = "2026-01-24T19:40:32.468Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fd/d9/eaa1f80170d2b7c5ba23f3b59f766f3a0bb41155fbc32a69adfa1adaaef9/mcp-1.26.0-py3-none-any.whl", hash = "sha256:904a21c33c25aa98ddbeb47273033c435e595bbacfdb177f4bd87f6dceebe1ca", size = 233615, upload-time = "2026-01-24T19:40:30.652Z" },
+]
+
+[[package]]
+name = "opentelemetry-api"
+version = "1.41.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "importlib-metadata" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fa/fc/b7564cbef36601aef0d6c9bc01f7badb64be8e862c2e1c3c5c3b43b53e4f/opentelemetry_api-1.41.1.tar.gz", hash = "sha256:0ad1814d73b875f84494387dae86ce0b12c68556331ce6ce8fe789197c949621", size = 71416, upload-time = "2026-04-24T13:15:38.262Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/29/59/3e7118ed140f76b0982ba4321bdaed1997a0473f9720de2d10788a577033/opentelemetry_api-1.41.1-py3-none-any.whl", hash = "sha256:a22df900e75c76dc08440710e51f52f1aa6b451b429298896023e60db5b3139f", size = 69007, upload-time = "2026-04-24T13:15:15.662Z" },
 ]
 
 [[package]]
@@ -589,6 +617,15 @@ wheels = [
 ]
 
 [[package]]
+name = "sniffio"
+version = "1.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/87/a6771e1546d97e7e041b6ae58d80074f81b7d5121207425c964ddf5cfdbd/sniffio-1.3.1.tar.gz", hash = "sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc", size = 20372, upload-time = "2024-02-25T23:20:04.057Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl", hash = "sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2", size = 10235, upload-time = "2024-02-25T23:20:01.196Z" },
+]
+
+[[package]]
 name = "sse-starlette"
 version = "3.3.2"
 source = { registry = "https://pypi.org/simple" }
@@ -654,4 +691,13 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/32/ce/eeb58ae4ac36fe09e3842eb02e0eb676bf2c53ae062b98f1b2531673efdd/uvicorn-0.41.0.tar.gz", hash = "sha256:09d11cf7008da33113824ee5a1c6422d89fbc2ff476540d69a34c87fab8b571a", size = 82633, upload-time = "2026-02-16T23:07:24.1Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/83/e4/d04a086285c20886c0daad0e026f250869201013d18f81d9ff5eada73a88/uvicorn-0.41.0-py3-none-any.whl", hash = "sha256:29e35b1d2c36a04b9e180d4007ede3bcb32a85fbdfd6c6aeb3f26839de088187", size = 68783, upload-time = "2026-02-16T23:07:22.357Z" },
+]
+
+[[package]]
+name = "zipp"
+version = "3.23.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/30/21/093488dfc7cc8964ded15ab726fad40f25fd3d788fd741cc1c5a17d78ee8/zipp-3.23.1.tar.gz", hash = "sha256:32120e378d32cd9714ad503c1d024619063ec28aad2248dc6672ad13edfa5110", size = 25965, upload-time = "2026-04-13T23:21:46.6Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/08/8a/0861bec20485572fbddf3dfba2910e38fe249796cb73ecdeb74e07eeb8d3/zipp-3.23.1-py3-none-any.whl", hash = "sha256:0b3596c50a5c700c9cb40ba8d86d9f2cc4807e9bedb06bcdf7fac85633e444dc", size = 10378, upload-time = "2026-04-13T23:21:45.386Z" },
 ]

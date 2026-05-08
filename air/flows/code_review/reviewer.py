@@ -1,4 +1,6 @@
 import logging
+import os
+import re
 
 from air.shared.config import AppConfig
 from air.flows.code_review.result import ReviewResult
@@ -7,9 +9,32 @@ from air.flows.code_review.target import ReviewTarget
 from claude_agent_sdk import query, ClaudeAgentOptions, ResultMessage, \
     ThinkingConfigDisabled
 from claude_agent_sdk._errors import ProcessError, MessageParseError
-from claude_agent_sdk.types import SystemPromptPreset
+from claude_agent_sdk.types import McpServerConfig, SystemPromptPreset
 
 logger = logging.getLogger(__name__)
+
+_JIRA_KEY_RE = re.compile(r"\b[A-Z][A-Z0-9]+-\d+\b")
+_BRANCH_ENV_KEYS = (
+    "CI_COMMIT_REF_NAME",
+    "CI_COMMIT_BRANCH",
+    "CI_MERGE_REQUEST_SOURCE_BRANCH_NAME",
+    "CI_MERGE_REQUEST_TITLE",
+)
+
+
+def _extract_jira_keys(target: ReviewTarget) -> list[str]:
+    """从提交标题和 CI 分支信息中提取 Jira 工单号"""
+    texts = [info.subject for info in target.commit_infos]
+    texts.extend(os.getenv(key, "") for key in _BRANCH_ENV_KEYS)
+
+    keys: list[str] = []
+    seen: set[str] = set()
+    for text in texts:
+        for key in _JIRA_KEY_RE.findall(text):
+            if key not in seen:
+                seen.add(key)
+                keys.append(key)
+    return keys
 
 
 def _parse_result_message(message: ResultMessage) -> ReviewResult:
@@ -63,7 +88,24 @@ class CodeReviewer:
                 commits=commits_str,
             )
 
+        if jira_instruction := self._build_jira_instruction(target):
+            prompt = f"{prompt}\n\n{jira_instruction}"
+
         return await self._query(prompt)
+
+    def _build_jira_instruction(self, target: ReviewTarget) -> str:
+        """构建 Jira 工单上下文审查指令"""
+        if not self.config.jira_mcp_configured:
+            return ""
+
+        keys = _extract_jira_keys(target)
+        key_hint = "、".join(keys) if keys else "未从提交标题或分支名中预提取到工单号"
+        return f"""Jira 工单上下文：
+- 已启用 mcp-atlassian。请从提交标题、分支名和变更内容中识别 Jira 工单号；当前候选：{key_hint}。
+- 如果找到工单号，请使用 Jira MCP 工具读取工单详情，结合 summary、description、status、priority、comments、验收标准等信息进行审查。
+- 审查时重点判断实现是否偏离工单需求、遗漏边界条件，或与工单状态/验收标准冲突。
+- 不要在结果中粘贴完整工单内容；只有指出具体问题时才引用必要字段。
+- 如果未找到工单或 Jira 查询失败，不要阻塞代码审查，仅在影响结论时简短说明。"""
 
     async def _query(self, prompt: str) -> ReviewResult:
         """公共 query 逻辑"""
@@ -110,6 +152,7 @@ class CodeReviewer:
         return ClaudeAgentOptions(
             cli_path=self.config.claude_cli_path,
             system_prompt=SystemPromptPreset(type="preset", preset="claude_code"),
+            mcp_servers=self._build_mcp_servers(),
             allowed_tools=["*"],
             permission_mode="bypassPermissions",
             setting_sources=["user"],
@@ -126,3 +169,44 @@ class CodeReviewer:
                 "DO_NOT_TRACK": "1",
             },
         )
+
+    def _build_mcp_servers(self) -> dict[str, McpServerConfig]:
+        """构建运行时 MCP server 配置"""
+        if not self.config.jira_mcp_enabled:
+            return {}
+
+        if not self.config.jira_url:
+            logger.warning("已启用 Jira MCP，但 JIRA_URL 未设置，跳过 Jira 上下文")
+            return {}
+
+        if not (self.config.jira_personal_token
+                or (self.config.jira_username and self.config.jira_api_token)):
+            logger.warning("已启用 Jira MCP，但缺少 Jira 认证信息，跳过 Jira 上下文")
+            return {}
+
+        env: dict[str, str] = {
+            "JIRA_URL": self.config.jira_url,
+            "READ_ONLY_MODE": "true" if self.config.jira_mcp_read_only else "false",
+        }
+        if self.config.jira_mcp_toolsets:
+            env["TOOLSETS"] = self.config.jira_mcp_toolsets
+        if self.config.jira_projects_filter:
+            env["JIRA_PROJECTS_FILTER"] = self.config.jira_projects_filter
+        if self.config.jira_ssl_verify:
+            env["JIRA_SSL_VERIFY"] = self.config.jira_ssl_verify
+
+        if self.config.jira_personal_token:
+            env["JIRA_PERSONAL_TOKEN"] = self.config.jira_personal_token
+        elif self.config.jira_username and self.config.jira_api_token:
+            env["JIRA_USERNAME"] = self.config.jira_username
+            env["JIRA_API_TOKEN"] = self.config.jira_api_token
+
+        server: McpServerConfig = {
+            "type": "stdio",
+            "command": self.config.jira_mcp_command,
+            "args": self.config.jira_mcp_args,
+            "env": env,
+        }
+        logger.info("启用 Jira MCP：url=%s, read_only=%s",
+                    self.config.jira_url, self.config.jira_mcp_read_only)
+        return {"mcp-atlassian": server}

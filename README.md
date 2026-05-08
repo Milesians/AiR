@@ -17,6 +17,8 @@
 | `OPENAI_MODEL` | 使用的模型名称 | `claude-sonnet-4-6` |
 | `DINGTALK_WEBHOOK_URL` | 钉钉机器人 Webhook 地址 | `https://oapi.dingtalk.com/robot/send?access_token=xxx` |
 | `DINGTALK_WEBHOOK_SECRET` | 钉钉机器人签名密钥（可选） | `SEC...` |
+| `JIRA_URL` | Jira Server/Data Center 地址（可选，用于工单上下文） | `http://jira.example.com:8080` |
+| `JIRA_PERSONAL_TOKEN` | Jira Personal Access Token（可选） | `pat-xxx` |
 
 > `CI_COMMIT_SHA`、`CI_COMMIT_BEFORE_SHA` 由 GitLab 自动注入，无需手动配置。
 
@@ -79,6 +81,8 @@ commit 数量 ≤ 上限？
     ├─ 是: Claude 逐个 git show 审查每个 commit
     └─ 否: Claude 审查 before..after 整体 diff
     │
+    ├─ 如已配置 Jira MCP: Claude 按需读取 Jira 工单上下文辅助审查
+    │
     ▼
 结构化审查结果（`body` Markdown 正文；结构化输出缺失时降级使用 Agent 文本结果）
     │
@@ -112,20 +116,50 @@ air/shared/                 # 公共配置与 prompt 加载器
 | `AIR_PROJECT_NAME` | — | 钉钉消息中展示的项目名称；未设置时优先使用 `CI_PROJECT_PATH` / `CI_PROJECT_NAME`，再回退到 `AIR_WORK_DIR` 目录名 |
 | `AIR_WORK_DIR` | — | 代码仓库路径，CI 中设为 `$CI_PROJECT_DIR`（命令行 `--work-dir` 优先） |
 | `AIR_MAX_COMMITS` | — | commit 数量上限，超过时降级为整体 diff 审查，默认 10 |
+| `AIR_JIRA_MCP_ENABLED` | — | 是否启用 Jira MCP；未设置时，只有检测到 `JIRA_URL` 和认证信息才自动启用 |
+| `AIR_JIRA_MCP_COMMAND` | — | Jira MCP 启动命令，默认 `uv` |
+| `AIR_JIRA_MCP_ARGS` | — | Jira MCP 启动参数，默认 `tool run mcp-atlassian` |
+| `AIR_JIRA_MCP_READ_ONLY` | — | Jira MCP 是否只读，默认 `true` |
+| `AIR_JIRA_MCP_TOOLSETS` | — | mcp-atlassian toolsets，默认 `default` |
+| `JIRA_URL` | — | Jira 实例地址；未设置时不会注入 Jira MCP |
+| `JIRA_PERSONAL_TOKEN` | — | Jira Server/Data Center Personal Access Token |
+| `JIRA_USERNAME` | — | Jira Cloud 用户名；仅在不用 PAT 时配合 `JIRA_API_TOKEN` 使用 |
+| `JIRA_API_TOKEN` | — | Jira Cloud API Token；仅在不用 PAT 时配合 `JIRA_USERNAME` 使用 |
+| `JIRA_SSL_VERIFY` | — | Jira SSL 校验开关，透传给 mcp-atlassian |
+| `JIRA_PROJECTS_FILTER` | — | 限制可访问的 Jira 项目 Key，逗号分隔 |
 | `CLAUDE_MAX_TURNS` | — | Claude 最大对话轮数，默认 10 |
 | `CI_COMMIT_SHA` | — | GitLab 自动注入，CI 模式必需 |
 | `CI_COMMIT_BEFORE_SHA` | — | GitLab 自动注入，用于确定 push 范围 |
 
 > 也可以直接使用 `ANTHROPIC_BASE_URL` / `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_MODEL`，`OPENAI_*` 变量是兼容别名。
 
+### Jira 工单上下文（可选）
+
+AiR 可以在 review 运行时通过 `mcp-atlassian` 读取 Jira 工单信息，并要求 Claude 结合工单 summary、description、status、comments、验收标准等内容判断实现是否偏离需求。
+
+自建 Jira Server/Data Center 推荐配置：
+
+```bash
+JIRA_URL=http://jira.example.com:8080
+JIRA_PERSONAL_TOKEN=your_personal_access_token
+```
+
+`.env` 按 `KEY=value` 写即可，不要写成 JSON/TOML 风格的 `JIRA_URL="http://jira.example.com:8080",`。
+
+行为约束：
+- 未配置 `JIRA_URL` 和认证信息时，AiR 不会注入 Jira MCP，也不会在 prompt 中要求查询 Jira。
+- 默认只读：`AIR_JIRA_MCP_READ_ONLY=true`，review 流程不会创建、修改或流转 Jira 工单。
+- 如需强制关闭，设置 `AIR_JIRA_MCP_ENABLED=false`。
+- 默认用 `uv tool run mcp-atlassian` 启动 MCP；如运行环境只提供 `uvx`，可设置 `AIR_JIRA_MCP_COMMAND=uvx`、`AIR_JIRA_MCP_ARGS=mcp-atlassian`。
+
 ---
 
 ## 命令行参数
 
 ```
-air                                    # CI 模式，自动检测 push 中的 commit 范围
-air --commit <SHA>                     # 审查指定的单个 commit
-air --commit <SHA> --work-dir /path    # 指定工作目录
+air                                    # CI / Docker 镜像中：自动检测 push 中的 commit 范围
+air --commit <SHA>                     # CI / Docker 镜像中：审查指定的单个 commit
+uv run air --commit <SHA>              # 本地源码开发：通过 uv 运行
 air --debug                            # 开启 Debug 日志
 ```
 
@@ -217,7 +251,7 @@ REPO_PATH=/path/to/your/repo    # 待审查的 git 仓库路径
 
 ```bash
 # 构建镜像 + 审查最新 commit + 推送钉钉（含 debug 日志）
-docker compose build && docker compose run --rm air air --commit HEAD --debug
+docker compose build && docker compose run --rm air sh -lc 'air --commit "${COMMIT_SHA:-HEAD}" --debug'
 ```
 
 #### 审查单个 commit

@@ -2,9 +2,13 @@ from dataclasses import dataclass, field
 import logging
 import os
 from pathlib import Path
+import shlex
 import shutil
 
 logger = logging.getLogger(__name__)
+
+_TRUE_VALUES = {"1", "true", "yes", "y", "on"}
+_FALSE_VALUES = {"0", "false", "no", "n", "off"}
 
 
 def _mask(value: str, show: int = 4) -> str:
@@ -14,6 +18,41 @@ def _mask(value: str, show: int = 4) -> str:
   if len(value) <= show * 2:
     return "***"
   return f"{value[:show]}***{value[-show:]}"
+
+
+def _env_bool(key: str, default: bool) -> bool:
+  """从环境变量解析布尔值"""
+  raw = os.getenv(key, "").strip()
+  if not raw:
+    return default
+
+  value = raw.lower()
+  if value in _TRUE_VALUES:
+    return True
+  if value in _FALSE_VALUES:
+    return False
+
+  logger.warning("环境变量 %s=%s 不是有效布尔值，使用默认值 %s", key, raw, default)
+  return default
+
+
+def _env_args(key: str, default: list[str]) -> list[str]:
+  """按 shell 参数规则解析环境变量"""
+  raw = os.getenv(key, "").strip()
+  if not raw:
+    return default
+  return shlex.split(raw)
+
+
+def _env_url(key: str) -> str:
+  """读取 URL 环境变量，并容错清理常见 .env 误写"""
+  value = os.getenv(key, "").strip()
+  if not value:
+    return ""
+
+  for _ in range(2):
+    value = value.strip().strip(",").strip().strip("\"'")
+  return value.rstrip("/")
 
 
 def _resolve_project_name(work_dir: str | None) -> str:
@@ -40,6 +79,22 @@ def _resolve_claude_cli_path() -> str:
   if path := os.getenv("CLAUDE_CLI_PATH"):
     return path
   return shutil.which("claude") or "/usr/local/bin/claude"
+
+
+def _resolve_jira_mcp_enabled() -> bool:
+  """解析是否启用 Jira MCP。
+
+  显式配置优先；未配置时，如果发现 Jira URL 和认证信息则自动启用。
+  """
+  if os.getenv("AIR_JIRA_MCP_ENABLED", "").strip():
+    return _env_bool("AIR_JIRA_MCP_ENABLED", False)
+
+  has_url = bool(os.getenv("JIRA_URL", "").strip())
+  has_pat = bool(os.getenv("JIRA_PERSONAL_TOKEN", "").strip())
+  has_api_token = bool(
+      os.getenv("JIRA_USERNAME", "").strip()
+      and os.getenv("JIRA_API_TOKEN", "").strip())
+  return has_url and (has_pat or has_api_token)
 
 
 def _bootstrap_anthropic_env() -> None:
@@ -74,6 +129,26 @@ class AppConfig:
   claude_cli_path: str | None = field(default=None)
   claude_max_turns: int = field(
     default_factory=lambda: int(os.getenv("CLAUDE_MAX_TURNS", "30")))
+
+  # Jira MCP。默认只读；当 JIRA_URL + 认证信息存在时自动启用。
+  jira_mcp_enabled: bool = field(default_factory=_resolve_jira_mcp_enabled)
+  jira_mcp_command: str = field(
+    default_factory=lambda: os.getenv("AIR_JIRA_MCP_COMMAND", "uv"))
+  jira_mcp_args: list[str] = field(
+    default_factory=lambda: _env_args(
+      "AIR_JIRA_MCP_ARGS", ["tool", "run", "mcp-atlassian"]))
+  jira_mcp_read_only: bool = field(
+    default_factory=lambda: _env_bool("AIR_JIRA_MCP_READ_ONLY", True))
+  jira_mcp_toolsets: str = field(
+    default_factory=lambda: os.getenv("AIR_JIRA_MCP_TOOLSETS", "default"))
+  jira_url: str = field(default_factory=lambda: _env_url("JIRA_URL"))
+  jira_personal_token: str = field(
+    default_factory=lambda: os.getenv("JIRA_PERSONAL_TOKEN", ""))
+  jira_username: str = field(default_factory=lambda: os.getenv("JIRA_USERNAME", ""))
+  jira_api_token: str = field(default_factory=lambda: os.getenv("JIRA_API_TOKEN", ""))
+  jira_ssl_verify: str = field(default_factory=lambda: os.getenv("JIRA_SSL_VERIFY", ""))
+  jira_projects_filter: str = field(
+    default_factory=lambda: os.getenv("JIRA_PROJECTS_FILTER", ""))
 
   # 钉钉
   dingtalk_webhook_url: str = field(
@@ -113,7 +188,23 @@ class AppConfig:
         self.claude_max_turns,
     )
     logger.info(
+        "Jira MCP 配置：enabled=%s, url=%s, command=%s %s, read_only=%s, token=%s",
+        self.jira_mcp_enabled,
+        self.jira_url or "(未设置)",
+        self.jira_mcp_command,
+        " ".join(self.jira_mcp_args),
+        self.jira_mcp_read_only,
+        _mask(self.jira_personal_token or self.jira_api_token),
+    )
+    logger.info(
         "钉钉配置：webhook=%s, secret=%s",
         _mask(self.dingtalk_webhook_url),
         _mask(self.dingtalk_webhook_secret),
     )
+
+  @property
+  def jira_mcp_configured(self) -> bool:
+    """Jira MCP 是否具备实际启动所需配置"""
+    has_auth = bool(self.jira_personal_token) or bool(
+      self.jira_username and self.jira_api_token)
+    return self.jira_mcp_enabled and bool(self.jira_url) and has_auth
