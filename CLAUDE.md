@@ -84,9 +84,9 @@ docker compose build && docker compose run --rm air sh -lc 'air --commit "${COMM
 
 | 变量 | 必填 | 说明 |
 |------|------|------|
-| `OPENAI_BASE_URL` | ✅ | API 地址（自动映射到 `ANTHROPIC_BASE_URL`） |
-| `OPENAI_API_KEY` | ✅ | API 密钥（自动映射到 `ANTHROPIC_AUTH_TOKEN`） |
-| `OPENAI_MODEL` | ✅ | 模型名称（同时设置所有 Claude 模型别名） |
+| `ANTHROPIC_BASE_URL` | ✅ | Anthropic 兼容 API 地址 |
+| `ANTHROPIC_AUTH_TOKEN` | ✅ | API Token |
+| `ANTHROPIC_MODEL` | ✅ | 模型名称 |
 | `DINGTALK_WEBHOOK_URL` | ✅ | 钉钉机器人 Webhook 地址 |
 | `DINGTALK_WEBHOOK_SECRET` | — | 钉钉机器人加签密钥 |
 | `AIR_CONTACTS` | — | 联系人配置（JSON），用于钉钉 @mention，根据 regex 匹配提交人，未匹配则 @maintainer |
@@ -108,8 +108,6 @@ docker compose build && docker compose run --rm air sh -lc 'air --commit "${COMM
 | `CLAUDE_MAX_TURNS` | — | Claude 最大对话轮数，默认 10 |
 | `CI_COMMIT_SHA` | — | GitLab 自动注入，CI 模式必需 |
 | `CI_COMMIT_BEFORE_SHA` | — | GitLab 自动注入，用于确定 push 范围 |
-
-> 也可直接使用 `ANTHROPIC_BASE_URL` / `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_MODEL`，`OPENAI_*` 是兼容别名。
 
 ## 技术要点
 

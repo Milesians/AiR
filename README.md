@@ -12,9 +12,9 @@
 
 | 变量名 | 说明 | 示例 |
 |--------|------|------|
-| `OPENAI_BASE_URL` | Claude/OpenAI 兼容 API 地址 | `https://api.example.com/v1` |
-| `OPENAI_API_KEY` | API 密钥 | `sk-xxx` |
-| `OPENAI_MODEL` | 使用的模型名称 | `claude-sonnet-4-6` |
+| `ANTHROPIC_BASE_URL` | Anthropic 兼容 API 地址 | `https://api.example.com/v1` |
+| `ANTHROPIC_AUTH_TOKEN` | API Token | `sk-xxx` |
+| `ANTHROPIC_MODEL` | 使用的模型名称 | `claude-sonnet-4-6` |
 | `DINGTALK_WEBHOOK_URL` | 钉钉机器人 Webhook 地址 | `https://oapi.dingtalk.com/robot/send?access_token=xxx` |
 | `DINGTALK_WEBHOOK_SECRET` | 钉钉机器人签名密钥（可选） | `SEC...` |
 | `JIRA_URL` | Jira Server/Data Center 地址（可选，用于工单上下文） | `http://jira.example.com:8080` |
@@ -107,9 +107,9 @@ air/shared/                 # 公共配置与 prompt 加载器
 
 | 变量名 | 必填 | 说明 |
 |--------|------|------|
-| `OPENAI_BASE_URL` | ✅ | API 地址（会映射到 `ANTHROPIC_BASE_URL`） |
-| `OPENAI_API_KEY` | ✅ | API 密钥（会映射到 `ANTHROPIC_AUTH_TOKEN`） |
-| `OPENAI_MODEL` | ✅ | 模型名称，同时设置所有 Claude 模型别名 |
+| `ANTHROPIC_BASE_URL` | ✅ | Anthropic 兼容 API 地址 |
+| `ANTHROPIC_AUTH_TOKEN` | ✅ | API Token |
+| `ANTHROPIC_MODEL` | ✅ | 模型名称 |
 | `DINGTALK_WEBHOOK_URL` | ✅ | 钉钉机器人 Webhook |
 | `DINGTALK_WEBHOOK_SECRET` | — | 钉钉机器人加签密钥 |
 | `AIR_CONTACTS` | — | 联系人配置（JSON），用于钉钉 @mention，详见下方说明 |
@@ -130,8 +130,6 @@ air/shared/                 # 公共配置与 prompt 加载器
 | `CLAUDE_MAX_TURNS` | — | Claude 最大对话轮数，默认 10 |
 | `CI_COMMIT_SHA` | — | GitLab 自动注入，CI 模式必需 |
 | `CI_COMMIT_BEFORE_SHA` | — | GitLab 自动注入，用于确定 push 范围 |
-
-> 也可以直接使用 `ANTHROPIC_BASE_URL` / `ANTHROPIC_AUTH_TOKEN` / `ANTHROPIC_MODEL`，`OPENAI_*` 变量是兼容别名。
 
 ### Jira 工单上下文（可选）
 
