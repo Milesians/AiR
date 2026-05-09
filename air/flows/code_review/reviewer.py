@@ -56,7 +56,7 @@ def _parse_result_message(message: ResultMessage) -> ReviewResult:
         logger.warning("ResultMessage 无 structured_output")
         result = ReviewResult(body="审查完成，但结果为空。")
 
-    logger.info("审查完成：正文 %d 字符", len(result.body))
+    logger.info("审查完成：正文 %d 字符，should_notify=%s", len(result.body), result.should_notify)
     return result
 
 

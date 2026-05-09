@@ -79,6 +79,10 @@ class DingtalkChannel:
         self.config = config
 
     def send(self, result: ReviewResult, target: ReviewTarget) -> bool:
+        if not result.should_notify:
+            logger.info("LLM 判断本次结果无需发送钉钉通知，跳过发送")
+            return False
+
         if not self.config.dingtalk_webhook_url:
             logger.warning("钉钉 Webhook URL 未配置，跳过发送")
             return False

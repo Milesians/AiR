@@ -51,7 +51,7 @@ docker compose build && docker compose run --rm air sh -lc 'air --commit "${COMM
 3. 若配置了 Jira MCP，`CodeReviewer` 将 `mcp-atlassian` 以只读方式注入 Claude Agent，并在 prompt 中要求结合 Jira 工单上下文审查
    - 未配置 `JIRA_URL` 和认证信息时，不注入 MCP，也不追加 Jira prompt 指令
 4. `CodeReviewer.review(target)` 调用 Claude 审查
-5. 审查结果经 `DingtalkChannel.send()` 推送到钉钉
+5. 审查结果经 `DingtalkChannel.send()` 推送到钉钉；如果 LLM 返回 `should_notify=false`，则跳过推送
 
 ### 关键模块
 
@@ -60,7 +60,7 @@ docker compose build && docker compose run --rm air sh -lc 'air --commit "${COMM
 | `air/flows/code_review/cli.py` | `air` 命令入口，解析参数并编排代码审查 |
 | `air/flows/code_review/target.py` | `CommitInfo`、`ReviewTarget` 及 Git commit 范围解析 |
 | `air/flows/code_review/reviewer.py` | `CodeReviewer`，根据 commit 数量选择审查 prompt 并调用 Claude |
-| `air/flows/code_review/result.py` | `ReviewResult`，承载 code review Markdown 正文 |
+| `air/flows/code_review/result.py` | `ReviewResult`，承载 code review Markdown 正文与是否通知 |
 | `air/flows/code_review/dingtalk.py` | `DingtalkChannel`，补充项目、提交信息和 @mention 后发送钉钉 |
 | `air/flows/code_review/contacts.py` | 联系人解析和提交人 @mention 匹配 |
 | `air/flows/code_review/prompts/` | code review prompt 模板 |
@@ -114,7 +114,7 @@ docker compose build && docker compose run --rm air sh -lc 'air --commit "${COMM
 ## 技术要点
 
 - 整体异步架构（`async/await`），入口通过 `asyncio.run()` 驱动
-- Claude 集成使用 `claude_agent_sdk.query()` + Pydantic JSON Schema 结构化输出；若 SDK 返回最终 `ResultMessage` 但缺少 `structured_output`，降级使用 `result` 文本，避免尾部 reader 错误覆盖已收到的结果
+- Claude 集成使用 `claude_agent_sdk.query()` + Pydantic JSON Schema 结构化输出；结果包含 `body` 和 `should_notify`，由 LLM 判断是否值得推送钉钉，过滤 `LGTM` 等无需人工关注的噪音；若 SDK 返回最终 `ResultMessage` 但缺少 `structured_output`，降级使用 `result` 文本，避免尾部 reader 错误覆盖已收到的结果
 - 统一使用 git 命令获取 diff 和仓库上下文；可选 Jira 工单上下文仅通过 MCP 只读获取
 - Jira 工单上下文通过 Claude Agent 的 `mcp_servers` 运行时注入；只有 Jira 环境变量完整时启用，默认 `READ_ONLY_MODE=true`
 - 构建后端为 `hatchling`，CLI 入口点定义在 `pyproject.toml` 的 `[project.scripts]`

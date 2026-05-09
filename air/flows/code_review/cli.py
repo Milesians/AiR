@@ -62,7 +62,16 @@ async def run(target: ReviewTarget, config: AppConfig) -> None:
     reviewer = CodeReviewer(config)
     result = await reviewer.review(target)
 
-    logger.info("审查结束，开始推送结果：body=%d字符", len(result.body))
+    logger.info(
+        "审查结束：body=%d字符, should_notify=%s",
+        len(result.body),
+        result.should_notify,
+    )
+    if not result.should_notify:
+        logger.info("LLM 判断本次结果无需通知，流程结束")
+        return
+
+    logger.info("开始推送结果")
     ok = DingtalkChannel(config).send(result, target)
     if ok:
         logger.info("结果推送完成")

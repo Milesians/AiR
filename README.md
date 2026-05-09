@@ -171,7 +171,8 @@ air --debug                            # 开启 Debug 日志
 
 审查结果将以 Markdown 格式发送：
 - 程序固定补充项目名称、涉及的提交信息（提交哈希、提交人、提交时间）与 @mention
-- Agent 仅返回一个 `body` 字段，其值会直接作为钉钉正文透传，标题也会优先从正文首行提取，结构不再由程序写死
+- Agent 返回 `body` 与 `should_notify` 两个字段；`body` 会直接作为钉钉正文透传，标题也会优先从正文首行提取
+- `should_notify=false` 时跳过钉钉推送，用于过滤 `LGTM` 等无需人工关注的噪音
 
 ### 联系人 @mention 配置
 
