@@ -150,6 +150,15 @@ class AppConfig:
   jira_projects_filter: str = field(
     default_factory=lambda: os.getenv("JIRA_PROJECTS_FILTER", ""))
 
+  # GitLab MR 评论
+  gitlab_api_url: str = field(default_factory=lambda: _env_url("CI_API_V4_URL"))
+  gitlab_token: str = field(default_factory=lambda: os.getenv("GITLAB_TOKEN", ""))
+  gitlab_project_id: str = field(
+    default_factory=lambda: os.getenv("CI_MERGE_REQUEST_PROJECT_ID", "").strip()
+    or os.getenv("CI_PROJECT_ID", "").strip())
+  gitlab_merge_request_iid: str = field(
+    default_factory=lambda: os.getenv("CI_MERGE_REQUEST_IID", "").strip())
+
   # 钉钉
   dingtalk_webhook_url: str = field(
     default_factory=lambda: os.getenv("DINGTALK_WEBHOOK_URL", ""))
@@ -195,6 +204,13 @@ class AppConfig:
         " ".join(self.jira_mcp_args),
         self.jira_mcp_read_only,
         _mask(self.jira_personal_token or self.jira_api_token),
+    )
+    logger.info(
+        "GitLab 配置：api_url=%s, project_id=%s, merge_request_iid=%s, token=%s",
+        self.gitlab_api_url or "(未设置)",
+        self.gitlab_project_id or "(未设置)",
+        self.gitlab_merge_request_iid or "(非 MR)",
+        _mask(self.gitlab_token),
     )
     logger.info(
         "钉钉配置：webhook=%s, secret=%s",

@@ -79,6 +79,25 @@ class AppConfigTest(unittest.TestCase):
 
         self.assertEqual(config.jira_url, "http://jira.example.com:8080")
 
+    def test_loads_gitlab_merge_request_config(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "CI_API_V4_URL": "https://gitlab.example.com/api/v4/",
+                "GITLAB_TOKEN": "secret-token",
+                "CI_PROJECT_ID": "10",
+                "CI_MERGE_REQUEST_PROJECT_ID": "12",
+                "CI_MERGE_REQUEST_IID": "34",
+            },
+            clear=True,
+        ):
+            config = AppConfig()
+
+        self.assertEqual(config.gitlab_api_url, "https://gitlab.example.com/api/v4")
+        self.assertEqual(config.gitlab_token, "secret-token")
+        self.assertEqual(config.gitlab_project_id, "12")
+        self.assertEqual(config.gitlab_merge_request_iid, "34")
+
 
 if __name__ == "__main__":
     unittest.main()
