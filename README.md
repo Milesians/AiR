@@ -1,6 +1,6 @@
 # AiR — AI Code Reviewer
 
-在 GitLab CI/CD 流水线中自动进行代码审查，使用 Claude Code (claude-agent-sdk) 对每次 push 中的所有 commit 进行分析，并将结果推送到钉钉。
+在 GitLab CI/CD 流水线中自动进行代码审查，使用 Claude Code (claude-agent-sdk) 分析代码变更，并将结果推送到钉钉；由 Merge Request 触发时也会发布为 MR 评论。
 
 ---
 
@@ -17,10 +17,11 @@
 | `ANTHROPIC_MODEL` | 使用的模型名称 | `claude-sonnet-4-6` |
 | `DINGTALK_WEBHOOK_URL` | 钉钉机器人 Webhook 地址 | `https://oapi.dingtalk.com/robot/send?access_token=xxx` |
 | `DINGTALK_WEBHOOK_SECRET` | 钉钉机器人签名密钥（可选） | `SEC...` |
+| `GITLAB_TOKEN` | GitLab Access Token（MR 评论时必填，需 `api` 写权限） | `glpat-xxx` |
 | `JIRA_URL` | Jira Server/Data Center 地址（可选，用于工单上下文） | `http://jira.example.com:8080` |
 | `JIRA_PERSONAL_TOKEN` | Jira Personal Access Token（可选） | `pat-xxx` |
 
-> `CI_COMMIT_SHA`、`CI_COMMIT_BEFORE_SHA` 由 GitLab 自动注入，无需手动配置。
+> `CI_COMMIT_SHA`、`CI_COMMIT_BEFORE_SHA`、`CI_API_V4_URL`、`CI_MERGE_REQUEST_PROJECT_ID` 和 `CI_MERGE_REQUEST_IID` 由 GitLab 自动注入，无需手动配置。`CI_JOB_TOKEN` 只能读取 MR Notes API，不能用于创建评论。
 
 ---
 
@@ -41,7 +42,24 @@ ai-code-review:
   allow_failure: true  # 审查失败不阻断流水线
 ```
 
-#### 方式二：只审查指定 commit
+#### 方式二：审查 Merge Request 变更并发布评论
+
+```yaml
+ai-code-review:
+  stage: review
+  image: ghcr.io/milesians/air/air:latest
+  variables:
+    AIR_WORK_DIR: $CI_PROJECT_DIR
+  script:
+    - air
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  allow_failure: true
+```
+
+MR Pipeline 中存在 `CI_MERGE_REQUEST_IID` 时，审查正文会通过 GitLab Notes API 发布到当前 MR。钉钉渠道仍保持启用。
+
+#### 方式三：只审查指定 commit
 
 ```yaml
 ai-code-review:
@@ -87,7 +105,11 @@ commit 数量 ≤ 上限？
 结构化审查结果（`body` Markdown 正文；结构化输出缺失时降级使用 Agent 文本结果）
     │
     ▼
-推送钉钉 Webhook
+输出审查结果
+    │
+    ├─ MR Pipeline: 发布 GitLab MR 评论（包括 LGTM）
+    │
+    └─ should_notify=true: 推送钉钉 Webhook
 ```
 
 ---
@@ -112,6 +134,7 @@ air/shared/                 # 公共配置与 prompt 加载器
 | `ANTHROPIC_MODEL` | ✅ | 模型名称 |
 | `DINGTALK_WEBHOOK_URL` | ✅ | 钉钉机器人 Webhook |
 | `DINGTALK_WEBHOOK_SECRET` | — | 钉钉机器人加签密钥 |
+| `GITLAB_TOKEN` | MR 时必填 | GitLab Access Token，需 `api` 写权限，用于创建 MR 评论 |
 | `AIR_CONTACTS` | — | 联系人配置（JSON），用于钉钉 @mention，详见下方说明 |
 | `AIR_PROJECT_NAME` | — | 钉钉消息中展示的项目名称；未设置时优先使用 `CI_PROJECT_PATH` / `CI_PROJECT_NAME`，再回退到 `AIR_WORK_DIR` 目录名 |
 | `AIR_WORK_DIR` | — | 代码仓库路径，CI 中设为 `$CI_PROJECT_DIR`（命令行 `--work-dir` 优先） |
@@ -130,6 +153,16 @@ air/shared/                 # 公共配置与 prompt 加载器
 | `CLAUDE_MAX_TURNS` | — | Claude 最大对话轮数，默认 10 |
 | `CI_COMMIT_SHA` | — | GitLab 自动注入，CI 模式必需 |
 | `CI_COMMIT_BEFORE_SHA` | — | GitLab 自动注入，用于确定 push 范围 |
+| `CI_API_V4_URL` | — | GitLab 自动注入，MR 评论 API 根地址 |
+| `CI_MERGE_REQUEST_PROJECT_ID` | — | GitLab MR Pipeline 自动注入，目标项目 ID |
+| `CI_MERGE_REQUEST_IID` | — | GitLab MR Pipeline 自动注入，当前 MR IID |
+
+### GitLab MR 评论
+
+- 仅当 `CI_MERGE_REQUEST_IID` 存在时发布 MR 评论，普通 push 不会调用 GitLab Notes API。
+- MR 评论始终发布完整 Review 正文，因此无问题时也会留下 `LGTM`。
+- `should_notify` 只控制钉钉通知；GitLab 评论发送失败不会关闭或阻断钉钉发送。
+- `GITLAB_TOKEN` 建议使用最小权限的 Project Access Token，并按 GitLab MR Pipeline 的保护规则配置 CI/CD 变量可见性。
 
 ### Jira 工单上下文（可选）
 

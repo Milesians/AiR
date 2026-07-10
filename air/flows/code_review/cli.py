@@ -8,6 +8,7 @@ load_dotenv()
 
 from air.flows.code_review.reviewer import CodeReviewer
 from air.flows.code_review.dingtalk import DingtalkChannel
+from air.flows.code_review.gitlab import GitLabChannel
 from air.shared.config import AppConfig
 from air.flows.code_review.target import ReviewTarget
 
@@ -67,16 +68,21 @@ async def run(target: ReviewTarget, config: AppConfig) -> None:
         len(result.body),
         result.should_notify,
     )
+
+    gitlab_ok = GitLabChannel(config).send(result)
+    if config.gitlab_merge_request_iid and not gitlab_ok:
+        logger.warning("GitLab MR 评论推送失败或未配置")
+
     if not result.should_notify:
-        logger.info("LLM 判断本次结果无需通知，流程结束")
+        logger.info("LLM 判断本次结果无需发送钉钉通知，流程结束")
         return
 
-    logger.info("开始推送结果")
+    logger.info("开始推送钉钉结果")
     ok = DingtalkChannel(config).send(result, target)
     if ok:
-        logger.info("结果推送完成")
+        logger.info("钉钉结果推送完成")
     else:
-        logger.warning("结果推送失败或未配置推送渠道")
+        logger.warning("钉钉结果推送失败或未配置推送渠道")
 
 
 def main() -> None:
