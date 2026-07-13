@@ -161,6 +161,7 @@ air/shared/                 # 公共配置与 prompt 加载器
 
 - 仅当 `CI_MERGE_REQUEST_IID` 存在时发布 MR 评论，普通 push 不会调用 GitLab Notes API。
 - MR 评论始终发布完整 Review 正文，因此无问题时也会留下 `LGTM`。
+- MR 评论顶部会标明由 AiR 自动生成；GitLab 显示的评论用户仅为 Access Token 所属账号。
 - `should_notify` 只控制钉钉通知；GitLab 评论发送失败不会关闭或阻断钉钉发送。
 - `GITLAB_TOKEN` 建议使用最小权限的 Project Access Token，并按 GitLab MR Pipeline 的保护规则配置 CI/CD 变量可见性。
 

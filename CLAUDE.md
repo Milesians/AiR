@@ -75,10 +75,10 @@ docker compose build && docker compose run --rm air sh -lc 'air --commit "${COMM
 
 ### 安全权限说明
 
-`CodeReviewer` 使用 `permission_mode="bypassPermissions"` 与 `allowed_tools=["*"]`，原因：
+`CodeReviewer` 使用 `permission_mode="bypassPermissions"`，不额外设置 `allowed_tools`，原因：
 - AiR 仅运行在 CI 容器或本地受控环境，对仓库已经有完整 checkout 权限。
 - 如配置 Jira MCP，仅注入只读 Jira 工具；未配置 Jira 环境变量时不会注入。
-- Code Review 需要 git/grep/读文件等几乎全集工具，逐项白名单维护成本远大于收益。
+- Claude Agent SDK 默认提供完整工具集，`bypassPermissions` 已自动批准工具调用；裸 `*` 不是合法的 allow 规则。
 - Agent 的工作目录被 `cwd=work_dir` 限定，Jira 访问由显式环境变量控制。
 若未来引入写操作或在生产宿主机直接执行，需要重新评估这一权限。
 
@@ -119,7 +119,7 @@ docker compose build && docker compose run --rm air sh -lc 'air --commit "${COMM
 
 - 整体异步架构（`async/await`），入口通过 `asyncio.run()` 驱动
 - Claude 集成使用 `claude_agent_sdk.query()` + Pydantic JSON Schema 结构化输出；结果包含 `body` 和 `should_notify`，由 LLM 判断是否值得推送钉钉，过滤 `LGTM` 等无需人工关注的钉钉噪音；MR 评论始终发布 `body`；若 SDK 返回最终 `ResultMessage` 但缺少 `structured_output`，降级使用 `result` 文本，避免尾部 reader 错误覆盖已收到的结果
-- GitLab MR 评论使用 `POST /projects/:id/merge_requests/:merge_request_iid/notes`；`CI_JOB_TOKEN` 对 Notes API 只有读权限，因此需要单独配置具有 `api` 写权限的 `GITLAB_TOKEN`
+- GitLab MR 评论使用 `POST /projects/:id/merge_requests/:merge_request_iid/notes`，正文顶部固定声明由 AiR 自动生成，避免被误认为由 Token 所属用户本人发布；`CI_JOB_TOKEN` 对 Notes API 只有读权限，因此需要单独配置具有 `api` 写权限的 `GITLAB_TOKEN`
 - 统一使用 git 命令获取 diff 和仓库上下文；可选 Jira 工单上下文仅通过 MCP 只读获取
 - Jira 工单上下文通过 Claude Agent 的 `mcp_servers` 运行时注入；只有 Jira 环境变量完整时启用，默认 `READ_ONLY_MODE=true`
 - 构建后端为 `hatchling`，CLI 入口点定义在 `pyproject.toml` 的 `[project.scripts]`

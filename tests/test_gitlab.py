@@ -49,7 +49,14 @@ class GitLabChannelTest(unittest.TestCase):
         self.assertTrue(ok)
         post.assert_called_once_with(
             "https://gitlab.example.com/api/v4/projects/12/merge_requests/34/notes",
-            json={"body": "LGTM"},
+            json={
+                "body": (
+                    "## AiR Code Review\n\n"
+                    "> 本评论由 **AiR** 自动生成并发布。GitLab 显示的评论用户仅为 "
+                    "Access Token 所属账号，不代表该用户本人发布。\n\n"
+                    "LGTM"
+                )
+            },
             headers={"PRIVATE-TOKEN": "secret-token"},
             timeout=30,
         )

@@ -116,6 +116,12 @@ class CodeReviewerQueryTest(unittest.IsolatedAsyncioTestCase):
 
 
 class CodeReviewerMcpTest(unittest.TestCase):
+    def test_uses_bypass_permissions_without_wildcard_allow_rule(self) -> None:
+        options = CodeReviewer(AppConfig())._build_options()
+
+        self.assertEqual(options.allowed_tools, [])
+        self.assertEqual(options.permission_mode, "bypassPermissions")
+
     def test_builds_read_only_jira_mcp_server(self) -> None:
         config = AppConfig(
             jira_mcp_enabled=True,

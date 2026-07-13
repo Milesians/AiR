@@ -153,7 +153,6 @@ class CodeReviewer:
             cli_path=self.config.claude_cli_path,
             system_prompt=SystemPromptPreset(type="preset", preset="claude_code"),
             mcp_servers=self._build_mcp_servers(),
-            allowed_tools=["*"],
             permission_mode="bypassPermissions",
             setting_sources=["user"],
             cwd=self.config.work_dir,

@@ -31,17 +31,23 @@ class GitLabChannel:
             f"{self.config.gitlab_api_url}/projects/{self.config.gitlab_project_id}"
             f"/merge_requests/{self.config.gitlab_merge_request_iid}/notes"
         )
+        body = (
+            "## AiR Code Review\n\n"
+            "> 本评论由 **AiR** 自动生成并发布。GitLab 显示的评论用户仅为 "
+            "Access Token 所属账号，不代表该用户本人发布。\n\n"
+            f"{result.body}"
+        )
         logger.info(
             "准备发布 GitLab MR 评论：project_id=%s, merge_request_iid=%s, body=%d字符",
             self.config.gitlab_project_id,
             self.config.gitlab_merge_request_iid,
-            len(result.body),
+            len(body),
         )
 
         try:
             response = requests.post(
                 url,
-                json={"body": result.body},
+                json={"body": body},
                 headers={"PRIVATE-TOKEN": self.config.gitlab_token},
                 timeout=30,
             )
