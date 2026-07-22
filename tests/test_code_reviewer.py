@@ -41,6 +41,25 @@ class ParseResultMessageTest(unittest.TestCase):
 
         self.assertEqual(result.body, "审查失败：Command failed with exit code 1")
 
+    def test_parses_structured_gitlab_comments(self) -> None:
+        result = _parse_result_message(_result_message(structured_output={
+            "body": "发现 1 个问题",
+            "comments": [{
+                "body": "缺少空值判断",
+                "old_path": "app.py",
+                "new_path": "app.py",
+                "start_line": {"old_line": 8, "new_line": 9},
+                "end_line": None,
+            }],
+            "should_notify": True,
+        }))
+
+        self.assertEqual(len(result.comments), 1)
+        start_line = result.comments[0].start_line
+        if start_line is None:
+            self.fail("结构化行内评论应包含 start_line")
+        self.assertEqual(start_line.new_line, 9)
+
 
 class CodeReviewerQueryTest(unittest.IsolatedAsyncioTestCase):
     async def test_drains_messages_after_result_message(self) -> None:
@@ -113,6 +132,8 @@ class CodeReviewerQueryTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.body, "LGTM")
         self.assertNotIn("Jira 工单上下文", captured["prompt"])
+        self.assertIn("`comments`", captured["prompt"])
+        self.assertIn("CI_MERGE_REQUEST_DIFF_BASE_SHA", captured["prompt"])
 
 
 class CodeReviewerMcpTest(unittest.TestCase):

@@ -64,8 +64,9 @@ async def run(target: ReviewTarget, config: AppConfig) -> None:
     result = await reviewer.review(target)
 
     logger.info(
-        "审查结束：body=%d字符, should_notify=%s",
+        "审查结束：body=%d字符, comments=%d条, should_notify=%s",
         len(result.body),
+        len(result.comments),
         result.should_notify,
     )
 

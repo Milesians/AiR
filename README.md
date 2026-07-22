@@ -1,6 +1,6 @@
 # AiR — AI Code Reviewer
 
-在 GitLab CI/CD 流水线中自动进行代码审查，使用 Claude Code (claude-agent-sdk) 分析代码变更，并将结果推送到钉钉；由 Merge Request 触发时也会发布为 MR 评论。
+在 GitLab CI/CD 流水线中自动进行代码审查，使用 Claude Code (claude-agent-sdk) 分析代码变更，并将结果推送到钉钉；由 Merge Request 触发时，具体代码问题会发布到对应 diff 行，整体问题会发布为普通 MR 评论。
 
 ---
 
@@ -17,11 +17,11 @@
 | `ANTHROPIC_MODEL` | 使用的模型名称 | `claude-sonnet-4-6` |
 | `DINGTALK_WEBHOOK_URL` | 钉钉机器人 Webhook 地址 | `https://oapi.dingtalk.com/robot/send?access_token=xxx` |
 | `DINGTALK_WEBHOOK_SECRET` | 钉钉机器人签名密钥（可选） | `SEC...` |
-| `GITLAB_TOKEN` | GitLab Access Token（MR 评论时必填，需 `api` 写权限） | `glpat-xxx` |
+| `GITLAB_TOKEN` | GitLab Access Token（MR 评论时必填，需 `api` 权限） | `glpat-xxx` |
 | `JIRA_URL` | Jira Server/Data Center 地址（可选，用于工单上下文） | `http://jira.example.com:8080` |
 | `JIRA_PERSONAL_TOKEN` | Jira Personal Access Token（可选） | `pat-xxx` |
 
-> `CI_COMMIT_SHA`、`CI_COMMIT_BEFORE_SHA`、`CI_API_V4_URL`、`CI_MERGE_REQUEST_PROJECT_ID` 和 `CI_MERGE_REQUEST_IID` 由 GitLab 自动注入，无需手动配置。`CI_JOB_TOKEN` 只能读取 MR Notes API，不能用于创建评论。
+> `CI_COMMIT_SHA`、`CI_COMMIT_BEFORE_SHA`、`CI_MERGE_REQUEST_DIFF_BASE_SHA`、`CI_API_V4_URL`、`CI_MERGE_REQUEST_PROJECT_ID` 和 `CI_MERGE_REQUEST_IID` 由 GitLab 自动注入，无需手动配置。`CI_JOB_TOKEN` 不具备创建 MR Notes/Discussions 所需的写权限，不能替代 `GITLAB_TOKEN`。
 
 ---
 
@@ -50,6 +50,7 @@ ai-code-review:
   image: ghcr.io/milesians/air/air:latest
   variables:
     AIR_WORK_DIR: $CI_PROJECT_DIR
+    GIT_DEPTH: "0"  # 保证 MR diff base commit 在本地可用
   script:
     - air
   rules:
@@ -57,7 +58,7 @@ ai-code-review:
   allow_failure: true
 ```
 
-MR Pipeline 中存在 `CI_MERGE_REQUEST_IID` 时，审查正文会通过 GitLab Notes API 发布到当前 MR。钉钉渠道仍保持启用。
+MR Pipeline 中存在 `CI_MERGE_REQUEST_IID` 时，AiR 会通过 Discussions API 将具体问题发布到对应代码行，并通过 Notes API 发布整体风格或无法定位的问题。钉钉渠道仍保持启用。
 
 #### 方式三：只审查指定 commit
 
@@ -102,12 +103,14 @@ commit 数量 ≤ 上限？
     ├─ 如已配置 Jira MCP: Claude 按需读取 Jira 工单上下文辅助审查
     │
     ▼
-结构化审查结果（`body` Markdown 正文；结构化输出缺失时降级使用 Agent 文本结果）
+结构化审查结果（`body` Markdown 正文、`comments` GitLab 评论位置；结构化输出缺失时降级使用 Agent 文本结果）
     │
     ▼
 输出审查结果
     │
-    ├─ MR Pipeline: 发布 GitLab MR 评论（包括 LGTM）
+    ├─ MR Pipeline
+    │   ├─ 具体代码问题: 发布到对应 diff 单行或多行范围
+    │   └─ 整体问题/定位失败: 聚合为普通 MR 评论（包括 LGTM）
     │
     └─ should_notify=true: 推送钉钉 Webhook
 ```
@@ -134,7 +137,7 @@ air/shared/                 # 公共配置与 prompt 加载器
 | `ANTHROPIC_MODEL` | ✅ | 模型名称 |
 | `DINGTALK_WEBHOOK_URL` | ✅ | 钉钉机器人 Webhook |
 | `DINGTALK_WEBHOOK_SECRET` | — | 钉钉机器人加签密钥 |
-| `GITLAB_TOKEN` | MR 时必填 | GitLab Access Token，需 `api` 写权限，用于创建 MR 评论 |
+| `GITLAB_TOKEN` | MR 时必填 | GitLab Access Token，需 `api` 权限，用于读取 MR diff version 并创建 Notes/Discussions |
 | `AIR_CONTACTS` | — | 联系人配置（JSON），用于钉钉 @mention，详见下方说明 |
 | `AIR_PROJECT_NAME` | — | 钉钉消息中展示的项目名称；未设置时优先使用 `CI_PROJECT_PATH` / `CI_PROJECT_NAME`，再回退到 `AIR_WORK_DIR` 目录名 |
 | `AIR_WORK_DIR` | — | 代码仓库路径，CI 中设为 `$CI_PROJECT_DIR`（命令行 `--work-dir` 优先） |
@@ -153,17 +156,22 @@ air/shared/                 # 公共配置与 prompt 加载器
 | `CLAUDE_MAX_TURNS` | — | Claude 最大对话轮数，默认 10 |
 | `CI_COMMIT_SHA` | — | GitLab 自动注入，CI 模式必需 |
 | `CI_COMMIT_BEFORE_SHA` | — | GitLab 自动注入，用于确定 push 范围 |
+| `CI_MERGE_REQUEST_DIFF_BASE_SHA` | — | GitLab MR Pipeline 自动注入，用于计算最终 MR diff 和评论行号 |
 | `CI_API_V4_URL` | — | GitLab 自动注入，MR 评论 API 根地址 |
 | `CI_MERGE_REQUEST_PROJECT_ID` | — | GitLab MR Pipeline 自动注入，目标项目 ID |
 | `CI_MERGE_REQUEST_IID` | — | GitLab MR Pipeline 自动注入，当前 MR IID |
 
 ### GitLab MR 评论
 
-- 仅当 `CI_MERGE_REQUEST_IID` 存在时发布 MR 评论，普通 push 不会调用 GitLab Notes API。
-- MR 评论始终发布完整 Review 正文，因此无问题时也会留下 `LGTM`。
-- MR 评论顶部会标明由 AiR 自动生成；GitLab 显示的评论用户仅为 Access Token 所属账号。
+- 仅当 `CI_MERGE_REQUEST_IID` 存在时发布 MR 评论，普通 push 不会调用 GitLab API。
+- 具体代码问题使用 Discussions API 发布为可解决的 diff discussion；新增行、删除行和上下文行分别使用 GitLab 对应的新旧行号规则。
+- 多行评论仅支持同一文件、同一 diff hunk 内的连续范围；AiR 从最新 MR diff version 计算 GitLab `line_code`，Agent 不负责生成该值。
+- 整体设计、代码风格或没有明确 diff 位置的问题会聚合为一条普通 Note。
+- 如果 diff version 获取失败、行号过期、范围无效或 GitLab 拒绝行内评论，该问题会降级到普通 Note，并保留原文件和行号信息。
+- Agent 未返回结构化 `comments` 时，仍会将完整 `body` 发布为普通 Note，因此无问题时会留下 `LGTM`。
+- 所有评论都会标明由 AiR 自动生成；GitLab 显示的评论用户仅为 Access Token 所属账号。
 - `should_notify` 只控制钉钉通知；GitLab 评论发送失败不会关闭或阻断钉钉发送。
-- `GITLAB_TOKEN` 建议使用最小权限的 Project Access Token，并按 GitLab MR Pipeline 的保护规则配置 CI/CD 变量可见性。
+- `GITLAB_TOKEN` 需要 `api` 权限，用于读取 MR diff version 并创建 Notes 和 Discussions；建议使用最小权限的 Project Access Token，并按 GitLab MR Pipeline 的保护规则配置 CI/CD 变量可见性。
 
 ### Jira 工单上下文（可选）
 
@@ -203,7 +211,7 @@ air --debug                            # 开启 Debug 日志
 
 审查结果将以 Markdown 格式发送：
 - 程序固定补充项目名称、涉及的提交信息（提交哈希、提交人、提交时间）与 @mention
-- Agent 返回 `body` 与 `should_notify` 两个字段；`body` 会直接作为钉钉正文透传，标题也会优先从正文首行提取
+- Agent 返回 `body`、`comments` 与 `should_notify` 三个字段；`body` 会直接作为钉钉正文透传，标题也会优先从正文首行提取，GitLab 位置数据不会改变钉钉格式
 - `should_notify=false` 时跳过钉钉推送，用于过滤 `LGTM` 等无需人工关注的噪音
 
 ### 联系人 @mention 配置

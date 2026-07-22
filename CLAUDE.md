@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # AiR - AI Code Reviewer
 
-CI/CD 流水线中的自动代码审查工具，使用 `claude-agent-sdk` 对 GitLab push 或 Merge Request 中的 commit 进行 Code Review，并将结果推送到钉钉 Webhook；MR Pipeline 同时发布 GitLab 评论。
+CI/CD 流水线中的自动代码审查工具，使用 `claude-agent-sdk` 对 GitLab push 或 Merge Request 中的 commit 进行 Code Review，并将结果推送到钉钉 Webhook；MR Pipeline 同时将具体问题发布到 GitLab diff 行，将整体问题发布为普通评论。
 
 ## 开发命令
 
@@ -51,7 +51,7 @@ docker compose build && docker compose run --rm air sh -lc 'air --commit "${COMM
 3. 若配置了 Jira MCP，`CodeReviewer` 将 `mcp-atlassian` 以只读方式注入 Claude Agent，并在 prompt 中要求结合 Jira 工单上下文审查
    - 未配置 `JIRA_URL` 和认证信息时，不注入 MCP，也不追加 Jira prompt 指令
 4. `CodeReviewer.review(target)` 调用 Claude 审查
-5. MR Pipeline 中，审查结果经 `GitLabChannel.send()` 发布到当前 MR，不受 `should_notify` 影响
+5. MR Pipeline 中，审查结果经 `GitLabChannel.send()` 发布到当前 MR：具体问题使用 Discussions API 定位到单行或多行 diff，整体问题使用 Notes API；定位失败时降级为普通评论，不受 `should_notify` 影响
 6. 审查结果经 `DingtalkChannel.send()` 推送到钉钉；如果 LLM 返回 `should_notify=false`，则仅跳过钉钉推送
 
 ### 关键模块
@@ -61,8 +61,8 @@ docker compose build && docker compose run --rm air sh -lc 'air --commit "${COMM
 | `air/flows/code_review/cli.py` | `air` 命令入口，解析参数并编排代码审查 |
 | `air/flows/code_review/target.py` | `CommitInfo`、`ReviewTarget` 及 Git commit 范围解析 |
 | `air/flows/code_review/reviewer.py` | `CodeReviewer`，根据 commit 数量选择审查 prompt 并调用 Claude |
-| `air/flows/code_review/result.py` | `ReviewResult`，承载 code review Markdown 正文与是否通知 |
-| `air/flows/code_review/gitlab.py` | `GitLabChannel`，在 MR Pipeline 中通过 Notes API 发布评论 |
+| `air/flows/code_review/result.py` | `ReviewResult`、`ReviewComment`、`ReviewLine`，承载 Markdown 正文、GitLab 评论位置与是否通知 |
+| `air/flows/code_review/gitlab.py` | `GitLabChannel`，通过 Discussions/Notes API 发布 MR 评论并处理多行定位和失败降级 |
 | `air/flows/code_review/dingtalk.py` | `DingtalkChannel`，补充项目、提交信息和 @mention 后发送钉钉 |
 | `air/flows/code_review/contacts.py` | 联系人解析和提交人 @mention 匹配 |
 | `air/flows/code_review/prompts/` | code review prompt 模板 |
@@ -91,7 +91,7 @@ docker compose build && docker compose run --rm air sh -lc 'air --commit "${COMM
 | `ANTHROPIC_MODEL` | ✅ | 模型名称 |
 | `DINGTALK_WEBHOOK_URL` | ✅ | 钉钉机器人 Webhook 地址 |
 | `DINGTALK_WEBHOOK_SECRET` | — | 钉钉机器人加签密钥 |
-| `GITLAB_TOKEN` | MR 时必填 | GitLab Access Token，需 `api` 写权限，用于创建 MR 评论 |
+| `GITLAB_TOKEN` | MR 时必填 | GitLab Access Token，需 `api` 权限，用于读取 MR diff version 并创建 Notes/Discussions |
 | `AIR_CONTACTS` | — | 联系人配置（JSON），用于钉钉 @mention，根据 regex 匹配提交人，未匹配则 @maintainer |
 | `AIR_PROJECT_NAME` | — | 钉钉消息中展示的项目名称；未设置时优先使用 `CI_PROJECT_PATH` / `CI_PROJECT_NAME`，再回退到工作目录名 |
 | `AIR_WORK_DIR` | — | 代码仓库路径，CI 中设为 `$CI_PROJECT_DIR`（命令行 `--work-dir` 优先） |
@@ -111,6 +111,7 @@ docker compose build && docker compose run --rm air sh -lc 'air --commit "${COMM
 | `CLAUDE_MAX_TURNS` | — | Claude 最大对话轮数，默认 10 |
 | `CI_COMMIT_SHA` | — | GitLab 自动注入，CI 模式必需 |
 | `CI_COMMIT_BEFORE_SHA` | — | GitLab 自动注入，用于确定 push 范围 |
+| `CI_MERGE_REQUEST_DIFF_BASE_SHA` | — | GitLab MR Pipeline 自动注入，用于计算最终 MR diff 和评论行号 |
 | `CI_API_V4_URL` | — | GitLab 自动注入，MR 评论 API 根地址 |
 | `CI_MERGE_REQUEST_PROJECT_ID` | — | GitLab MR Pipeline 自动注入，目标项目 ID |
 | `CI_MERGE_REQUEST_IID` | — | GitLab MR Pipeline 自动注入，当前 MR IID |
@@ -118,8 +119,9 @@ docker compose build && docker compose run --rm air sh -lc 'air --commit "${COMM
 ## 技术要点
 
 - 整体异步架构（`async/await`），入口通过 `asyncio.run()` 驱动
-- Claude 集成使用 `claude_agent_sdk.query()` + Pydantic JSON Schema 结构化输出；结果包含 `body` 和 `should_notify`，由 LLM 判断是否值得推送钉钉，过滤 `LGTM` 等无需人工关注的钉钉噪音；MR 评论始终发布 `body`；若 SDK 返回最终 `ResultMessage` 但缺少 `structured_output`，降级使用 `result` 文本，避免尾部 reader 错误覆盖已收到的结果
-- GitLab MR 评论使用 `POST /projects/:id/merge_requests/:merge_request_iid/notes`，正文顶部固定声明由 AiR 自动生成，避免被误认为由 Token 所属用户本人发布；`CI_JOB_TOKEN` 对 Notes API 只有读权限，因此需要单独配置具有 `api` 写权限的 `GITLAB_TOKEN`
+- Claude 集成使用 `claude_agent_sdk.query()` + Pydantic JSON Schema 结构化输出；结果包含 `body`、`comments` 和 `should_notify`。`body` 继续作为完整钉钉正文，`comments` 提供 GitLab 新旧路径及起止行；若 SDK 缺少 `structured_output`，降级使用 `result` 文本并作为普通 MR 评论发布
+- GitLab 行内评论使用 Discussions API：先读取最新 diff version 获取 base/start/head SHA，多行范围再读取该 version 的文件 diff，由程序解析 hunk 并按 `SHA1(new_path)_old_position_new_position` 生成 `line_code`；仅允许同一文件、同一 hunk 内的范围
+- 整体问题通过 Notes API 聚合发布；diff 获取失败、范围无效或 Discussion 创建失败时保留原位置并降级到普通 Note。所有正文固定声明由 AiR 自动生成；`CI_JOB_TOKEN` 不具备所需写权限，因此需要单独配置具有 `api` 权限的 `GITLAB_TOKEN`
 - 统一使用 git 命令获取 diff 和仓库上下文；可选 Jira 工单上下文仅通过 MCP 只读获取
 - Jira 工单上下文通过 Claude Agent 的 `mcp_servers` 运行时注入；只有 Jira 环境变量完整时启用，默认 `READ_ONLY_MODE=true`
 - 构建后端为 `hatchling`，CLI 入口点定义在 `pyproject.toml` 的 `[project.scripts]`
